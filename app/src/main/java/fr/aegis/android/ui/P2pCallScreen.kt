@@ -90,7 +90,8 @@ fun P2pCallScreen(
                 Button(
                     onClick = {
                         val mic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                        if (mic) {
+                        val camera = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                        if (mic && camera) {
                             runCatching { engine.acceptPendingOffer(); started = true }
                         } else {
                             permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
@@ -109,7 +110,8 @@ fun P2pCallScreen(
             Button(
                 onClick = {
                     val mic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                    if (mic) {
+                    val camera = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                    if (mic && camera) {
                         runCatching { engine.startOutgoingCall(); started = true }
                     } else {
                         permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
