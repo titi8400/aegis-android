@@ -7,6 +7,7 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Looper
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -121,6 +122,10 @@ fun P2pChatScreen(
             }
         }
         listener = object : LocationListener {
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
+            override fun onProviderEnabled(provider: String) = Unit
+            override fun onProviderDisabled(provider: String) = Unit
+
             override fun onLocationChanged(location: Location) {
                 manager.removeUpdates(this)
                 mainHandler.removeCallbacks(timeout)
