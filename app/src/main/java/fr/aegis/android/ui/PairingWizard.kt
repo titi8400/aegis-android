@@ -115,7 +115,7 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
     }
 
     if (scanMode != null) {
-        PairingQrScanner(onInviteScanned = ::handleScan, onClose = { scanMode = null })
+        PairingQrScanner(onPayloadScanned = ::handleScan, onClose = { scanMode = null })
         return
     }
 
