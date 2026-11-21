@@ -16,7 +16,7 @@ AEGIS est un projet de communication Android de pair à pair (P2P), destiné à 
 - Après 10 échecs comptabilisés, suppression de la clé d'identité Android Keystore et réinitialisation du verrouillage local.
 - Création d'une identité de signature ECDSA P-256 dans Android Keystore.
 - Création d'invitations d'appairage signées, limitées à cinq minutes.
-- Génération d'un QR code à partir de l'invitation signée.
+- Génération et affichage dans l’application d’un QR code à partir de l’invitation signée, valable cinq minutes.
 - Scan des QR d'invitation avec CameraX et ML Kit, après autorisation caméra.
 - Vérification locale de la signature, rejet des clés EC qui ne sont pas P-256 et calcul de l'empreinte SHA-256 de la clé publique.
 
