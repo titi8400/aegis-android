@@ -25,7 +25,7 @@ jobs:
         with:
           gradle-version: '8.11.1'
       - name: Build debug APK
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
       - name: Publish debug APK artifact
         uses: actions/upload-artifact@v4
         with:
