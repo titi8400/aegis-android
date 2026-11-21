@@ -70,6 +70,9 @@ import kotlin.concurrent.thread
 import kotlinx.coroutines.delay
 import java.util.UUID
 import java.util.Locale
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
@@ -99,6 +102,7 @@ fun P2pChatScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var session by remember { mutableStateOf<P2pLanTransport.SecureSession?>(null) }
     var activePeerId by remember { mutableStateOf<String?>(null) }
+    val pendingAcks = remember { ConcurrentHashMap<String, CompletableFuture<Unit>>() }
     var pendingOutboxCount by remember { mutableStateOf(0) }
     var listening by remember { mutableStateOf(false) }
     var ephemeralMinutes by remember { mutableStateOf(0) }
@@ -356,6 +360,27 @@ fun P2pChatScreen(
         onIncomingOffer = { mainHandler.post { callOpen = true } }
     )
 
+    fun sendAndAwaitDeliveryAck(
+        connected: P2pLanTransport.SecureSession,
+        messageId: String,
+        body: String,
+        createdAtEpochMs: Long,
+        expiresAtEpochMs: Long?
+    ) {
+        val acknowledgement = CompletableFuture<Unit>()
+        check(pendingAcks.putIfAbsent(messageId, acknowledgement) == null) {
+            "Transmission de ce message déjà en cours."
+        }
+        val frame = P2pWireCodec.encodeText(body, createdAtEpochMs, expiresAtEpochMs, messageId)
+        try {
+            connected.sendFrame(frame)
+            acknowledgement.get(15, TimeUnit.SECONDS)
+        } finally {
+            frame.fill(0)
+            pendingAcks.remove(messageId, acknowledgement)
+        }
+    }
+
     fun attachSession(connected: P2pLanTransport.SecureSession, label: String) {
         session?.close()
         session = connected
@@ -380,25 +405,24 @@ fun P2pChatScreen(
                 var delivered = 0
                 for (item in pending) {
                     if (!connected.isOpen) break
-                    val frame = P2pWireCodec.encodeText(
-                        item.body, item.createdAtEpochMs, item.expiresAtEpochMs, item.id
+                    sendAndAwaitDeliveryAck(
+                        connected,
+                        item.id,
+                        item.body,
+                        item.createdAtEpochMs,
+                        item.expiresAtEpochMs
                     )
-                    try {
-                        connected.sendFrame(frame)
-                        outboxStore.markSent(connected.remoteDeviceId, item.id)
-                        conversationStore.append(
-                            connected.remoteDeviceId,
-                            item.body,
-                            outgoing = true,
-                            nowEpochMs = System.currentTimeMillis(),
-                            expiresAtEpochMs = item.expiresAtEpochMs,
-                            messageId = item.id,
-                            createdAtEpochMs = item.createdAtEpochMs
-                        )
-                        delivered++
-                    } finally {
-                        frame.fill(0)
-                    }
+                    outboxStore.markSent(connected.remoteDeviceId, item.id)
+                    conversationStore.append(
+                        connected.remoteDeviceId,
+                        item.body,
+                        outgoing = true,
+                        nowEpochMs = System.currentTimeMillis(),
+                        expiresAtEpochMs = item.expiresAtEpochMs,
+                        messageId = item.id,
+                        createdAtEpochMs = item.createdAtEpochMs
+                    )
+                    delivered++
                 }
                 mainHandler.post {
                     pendingOutboxCount = runCatching { outboxStore.list(connected.remoteDeviceId).size }.getOrDefault(0)
@@ -423,6 +447,12 @@ fun P2pChatScreen(
                             callEngine?.handleSignal(signal)
                                 ?: run { error = "Moteur d'appel indisponible." }
                         }
+                        continue
+                    }
+                    if (P2pWireCodec.isAckFrame(frame)) {
+                        val acknowledgedId = P2pWireCodec.decodeAck(frame)
+                        frame.fill(0)
+                        pendingAcks.remove(acknowledgedId)?.complete(Unit)
                         continue
                     }
                     if (P2pFileTransferCodec.isFilePacket(frame)) {
@@ -455,6 +485,7 @@ fun P2pChatScreen(
                             messageId = decoded.id,
                             createdAtEpochMs = decoded.createdAtEpochMs
                         )
+                        connected.sendFrame(P2pWireCodec.encodeAck(decoded.id))
                         mainHandler.post { history.add(ChatLine(false, decoded.body, decoded.expiresAtEpochMs != null)) }
                     }
                 }
@@ -765,16 +796,11 @@ fun P2pChatScreen(
                         if (current != null && current.isOpen) {
                             thread(name = "aegis-outbox-send", isDaemon = true) {
                                 try {
-                                    val frame = P2pWireCodec.encodeText(body, createdAt, expiresAt, messageId)
-                                    try {
-                                        current.sendFrame(frame)
-                                        outboxStore.markSent(peerId, messageId)
-                                        mainHandler.post {
-                                            pendingOutboxCount = outboxStore.list(peerId).size
-                                            status = "Message transmis."
-                                        }
-                                    } finally {
-                                        frame.fill(0)
+                                    sendAndAwaitDeliveryAck(current, messageId, body, createdAt, expiresAt)
+                                    outboxStore.markSent(peerId, messageId)
+                                    mainHandler.post {
+                                        pendingOutboxCount = outboxStore.list(peerId).size
+                                        status = "Message reçu et enregistré par le correspondant."
                                     }
                                 } catch (failure: Exception) {
                                     current.close()
