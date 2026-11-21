@@ -15,6 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -232,7 +233,7 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
                 singleLine = true,
                 label = { Text("Nom de l’appareil") }
             )
-            androidx.compose.material3.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Checkbox(checked = fingerprintsCompared, onCheckedChange = { fingerprintsCompared = it })
                 Text("J’ai comparé les deux empreintes complètes avec l’autre personne par un canal indépendant.", color = Color.White, fontSize = 10.sp)
             }
