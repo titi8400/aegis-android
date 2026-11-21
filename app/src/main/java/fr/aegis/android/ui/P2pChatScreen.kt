@@ -1,10 +1,17 @@
 package fr.aegis.android.ui
 
 import android.provider.OpenableColumns
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.Looper
 import android.os.Handler
 import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,6 +61,7 @@ import java.nio.charset.StandardCharsets
 import kotlin.concurrent.thread
 import kotlinx.coroutines.delay
 import java.util.UUID
+import java.util.Locale
 
 private data class ChatLine(val outgoing: Boolean, val body: String, val ephemeral: Boolean = false)
 
@@ -82,6 +90,80 @@ fun P2pChatScreen(
     var listening by remember { mutableStateOf(false) }
     var ephemeralMinutes by remember { mutableStateOf(0) }
     var isSendingFile by remember { mutableStateOf(false) }
+    var locationPermissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    fun shareCurrentLocation() {
+        val current = session
+        val peerId = activePeerId
+        if (current == null || peerId == null) {
+            error = "Aucun pair connecté."
+            return
+        }
+        val manager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as LocationManager
+        val provider = when {
+            manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+            manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+            else -> {
+                error = "Aucun fournisseur de localisation activé."
+                return
+            }
+        }
+        var listener: LocationListener? = null
+        status = "Recherche d’une position actuelle…"
+        val timeout = Runnable {
+            listener?.let { runCatching { manager.removeUpdates(it) } }
+            if (status == "Recherche d’une position actuelle…") {
+                status = "Position indisponible (délai dépassé)."
+            }
+        }
+        listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                manager.removeUpdates(this)
+                mainHandler.removeCallbacks(timeout)
+                try {
+                    val latitude = String.format(Locale.US, "%.6f", location.latitude)
+                    val longitude = String.format(Locale.US, "%.6f", location.longitude)
+                    val body = "Ma position : https://maps.google.com/?q=$latitude,$longitude (précision ±${location.accuracy.toInt()} m)"
+                    val createdAt = System.currentTimeMillis()
+                    val expiresAt = if (ephemeralMinutes == 0) null else createdAt + ephemeralMinutes * 60_000L
+                    val messageId = UUID.randomUUID().toString()
+                    val frame = P2pWireCodec.encodeText(body, createdAt, expiresAt, messageId)
+                    current.sendFrame(frame)
+                    frame.fill(0)
+                    conversationStore.append(
+                        peerId, body, outgoing = true, nowEpochMs = createdAt,
+                        expiresAtEpochMs = expiresAt, messageId = messageId, createdAtEpochMs = createdAt
+                    )
+                    history.add(ChatLine(true, body, expiresAt != null))
+                    status = "Position partagée avec le pair connecté."
+                    error = null
+                } catch (failure: Exception) {
+                    error = failure.message ?: "Partage de position impossible."
+                }
+            }
+        }
+        try {
+            manager.requestSingleUpdate(provider, listener!!, Looper.getMainLooper())
+            mainHandler.postDelayed(timeout, 20_000L)
+        } catch (failure: SecurityException) {
+            error = "Autorisation de localisation refusée."
+        } catch (failure: Exception) {
+            error = failure.message ?: "Impossible d'obtenir la position."
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        locationPermissionGranted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (locationPermissionGranted) shareCurrentLocation()
+        else error = "Autorisation de localisation refusée."
+    }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val fileId = pendingExportId
         pendingExportId = null
@@ -379,6 +461,19 @@ fun P2pChatScreen(
             label = { Text("Message") },
             enabled = session != null
         )
+        Button(
+            onClick = {
+                if (locationPermissionGranted) shareCurrentLocation()
+                else locationPermissionLauncher.launch(arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = session != null,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10233B), contentColor = Color(0xFF00BFFF))
+        ) { Text("PARTAGER MA POSITION ACTUELLE") }
+
         Button(
             onClick = { importLauncher.launch(arrayOf("*/*")) },
             modifier = Modifier.fillMaxWidth(),
