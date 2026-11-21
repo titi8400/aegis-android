@@ -81,6 +81,7 @@ fun P2pChatScreen(
     var activePeerId by remember { mutableStateOf<String?>(null) }
     var listening by remember { mutableStateOf(false) }
     var ephemeralMinutes by remember { mutableStateOf(0) }
+    var isSendingFile by remember { mutableStateOf(false) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val fileId = pendingExportId
         pendingExportId = null
@@ -103,8 +104,11 @@ fun P2pChatScreen(
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val current = session
-        if (uri != null && current != null) {
+        if (uri != null && current != null && !isSendingFile) {
+            isSendingFile = true
             thread(name = "aegis-file-send", isDaemon = true) {
+                var fileBytes: ByteArray? = null
+                var fileDigest: ByteArray? = null
                 try {
                     var name = "fichier-aegis"
                     var reportedSize = -1L
@@ -133,6 +137,7 @@ fun P2pChatScreen(
                         buffer.fill(0)
                         output.toByteArray()
                     } ?: throw IllegalStateException("Impossible de lire le fichier sélectionné.")
+                    fileBytes = bytes
                     require(bytes.isNotEmpty()) { "Fichier vide." }
                     val transferId = UUID.randomUUID().toString()
                     current.sendFrame(P2pFileTransferCodec.encodeStart(
@@ -151,12 +156,15 @@ fun P2pChatScreen(
                         index++
                     }
                     val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+                    fileDigest = digest
                     current.sendFrame(P2pFileTransferCodec.encodeFinish(transferId, digest))
-                    bytes.fill(0)
-                    digest.fill(0)
-                    mainHandler.post { status = "Fichier envoyé : $safeName"; error = null }
+                    mainHandler.post { status = "Fichier transmis : $safeName"; error = null }
                 } catch (failure: Exception) {
                     mainHandler.post { error = failure.message ?: "Transfert de fichier impossible." }
+                } finally {
+                    fileBytes?.fill(0)
+                    fileDigest?.fill(0)
+                    mainHandler.post { isSendingFile = false }
                 }
             }
         }
@@ -374,9 +382,9 @@ fun P2pChatScreen(
         Button(
             onClick = { importLauncher.launch(arrayOf("*/*")) },
             modifier = Modifier.fillMaxWidth(),
-            enabled = session != null,
+            enabled = session != null && !isSendingFile,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10233B), contentColor = Color(0xFF00BFFF))
-        ) { Text("ENVOYER UN FICHIER (20 MIO MAX.)") }
+        ) { Text(if (isSendingFile) "TRANSFERT EN COURS…" else "ENVOYER UN FICHIER (20 MIO MAX.)") }
 
         if (receivedFiles.isNotEmpty()) {
             Text("FICHIERS REÇUS — COFFRE CHIFFRÉ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
