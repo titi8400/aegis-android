@@ -16,7 +16,11 @@ class IncomingFileAssembler {
         val sha256: ByteArray
     )
 
-    private class WipingOutputStream : ByteArrayOutputStream() {\n        fun wipe() { buf.fill(0); reset() }\n    }\n\n    private data class ActiveTransfer(
+    private class WipingOutputStream : ByteArrayOutputStream() {
+        fun wipe() { buf.fill(0); reset() }
+    }
+
+    private data class ActiveTransfer(
         val start: P2pFileTransferCodec.Packet.Start,
         val output: WipingOutputStream,
         var nextChunkIndex: Int = 0
