@@ -15,7 +15,9 @@ AEGIS est une application Android native de communication privée, conçue autou
 | Découverte des appareils approuvés sur le même LAN | Implémentée |
 | Connexion TCP directe avec TLS mutuel et épinglage de clés | Implémentée dans le code |
 | Échange de messages texte sur cette connexion | Interface et transport implémentés |
-| Transfert de fichiers directs (20 Mio maximum) | Implémenté avec blocs de 512 Kio et contrôle SHA-256 |\n| Notes vocales | Enregistrement WAV jusqu’à 30 secondes, transfert et lecture locale |\n| Partage de position ponctuel | Implémenté avec autorisation et action explicites |
+| Transfert de fichiers directs (20 Mio maximum) | Implémenté avec blocs de 512 Kio et contrôle SHA-256 |
+| Notes vocales | Enregistrement WAV jusqu’à 30 secondes, transfert et lecture locale |
+| Partage de position ponctuel | Implémenté avec autorisation et action explicites |
 | Stockage local des fichiers reçus | Chiffré AES-256-GCM |
 | Historique local par pair chiffré AES-256-GCM | Implémenté |
 | Messages texte éphémères (1 min, 1 h, 24 h) | Implémentés avec purge locale périodique |
