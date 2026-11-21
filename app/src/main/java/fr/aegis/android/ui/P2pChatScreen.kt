@@ -1,7 +1,12 @@
 package fr.aegis.android.ui
 
+import android.content.Intent
+import android.database.Cursor
+import android.provider.OpenableColumns
 import android.os.Handler
 import android.os.Looper
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,10 +41,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.aegis.android.security.AndroidKeyStoreIdentity
 import fr.aegis.android.security.ConversationStore
+import fr.aegis.android.security.IncomingFileAssembler
+import fr.aegis.android.security.P2pFileTransferCodec
+import fr.aegis.android.security.ReceivedFileStore
 import fr.aegis.android.security.P2pLanDiscovery
 import fr.aegis.android.security.P2pLanTransport
 import fr.aegis.android.security.P2pWireCodec
 import fr.aegis.android.security.TrustedPeerStore
+import java.io.ByteArrayOutputStream
+import java.security.MessageDigest
+import java.util.UUID
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.nio.charset.StandardCharsets
@@ -57,6 +68,9 @@ fun P2pChatScreen(
     val context = LocalContext.current
     val peerStore = remember { TrustedPeerStore(context.applicationContext) }
     val conversationStore = remember { ConversationStore(context.applicationContext) }
+    val receivedFileStore = remember { ReceivedFileStore(context.applicationContext) }
+    val receivedFiles = remember { mutableStateListOf<ReceivedFileStore.ReceivedFile>() }
+    var pendingExportId by remember { mutableStateOf<String?>(null) }
     val transport = remember { P2pLanTransport(identity, peerStore) }
     val discovery = remember { P2pLanDiscovery(identity, peerStore) }
     val discoveredPeers = remember { mutableStateListOf<P2pLanDiscovery.DiscoveredPeer>() }
@@ -70,11 +84,90 @@ fun P2pChatScreen(
     var activePeerId by remember { mutableStateOf<String?>(null) }
     var listening by remember { mutableStateOf(false) }
     var ephemeralMinutes by remember { mutableStateOf(0) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        val fileId = pendingExportId
+        pendingExportId = null
+        if (uri != null && fileId != null) {
+            thread(name = "aegis-file-export", isDaemon = true) {
+                try {
+                    val bytes = receivedFileStore.read(fileId) ?: error("Fichier reçu introuvable.")
+                    context.contentResolver.openOutputStream(uri, "w")?.use { output -> output.write(bytes) }
+                        ?: error("Impossible d’écrire le fichier exporté.")
+                    bytes.fill(0)
+                    mainHandler.post { status = "Fichier exporté dans l’emplacement choisi." }
+                } catch (failure: Exception) {
+                    mainHandler.post { error = failure.message ?: "Export du fichier impossible." }
+                }
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val current = session
+        if (uri != null && current != null) {
+            thread(name = "aegis-file-send", isDaemon = true) {
+                try {
+                    var name = "fichier-aegis"
+                    var reportedSize = -1L
+                    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                            if (nameIndex >= 0) name = cursor.getString(nameIndex) ?: name
+                            if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) reportedSize = cursor.getLong(sizeIndex)
+                        }
+                    }
+                    val safeName = P2pFileTransferCodec.sanitizeFileName(name)
+                    val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                    if (reportedSize > P2pFileTransferCodec.MAX_FILE_BYTES) error("Fichier supérieur à 20 Mio.")
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                        val output = ByteArrayOutputStream()
+                        val buffer = ByteArray(64 * 1024)
+                        var total = 0L
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            require(total <= P2pFileTransferCodec.MAX_FILE_BYTES) { "Fichier supérieur à 20 Mio." }
+                            output.write(buffer, 0, count)
+                        }
+                        buffer.fill(0)
+                        output.toByteArray()
+                    } ?: error("Impossible de lire le fichier sélectionné.")
+                    require(bytes.isNotEmpty()) { "Fichier vide." }
+                    val transferId = UUID.randomUUID().toString()
+                    current.sendFrame(P2pFileTransferCodec.encodeStart(
+                        P2pFileTransferCodec.Packet.Start(transferId, safeName, mime, bytes.size.toLong())
+                    ))
+                    var index = 0
+                    var offset = 0
+                    while (offset < bytes.size) {
+                        val end = minOf(offset + P2pFileTransferCodec.CHUNK_BYTES, bytes.size)
+                        val chunk = bytes.copyOfRange(offset, end)
+                        val frame = P2pFileTransferCodec.encodeChunk(transferId, index, chunk)
+                        current.sendFrame(frame)
+                        chunk.fill(0)
+                        frame.fill(0)
+                        offset = end
+                        index++
+                    }
+                    val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+                    current.sendFrame(P2pFileTransferCodec.encodeFinish(transferId, digest))
+                    bytes.fill(0)
+                    digest.fill(0)
+                    mainHandler.post { status = "Fichier envoyé : $safeName"; error = null }
+                } catch (failure: Exception) {
+                    mainHandler.post { error = failure.message ?: "Transfert de fichier impossible." }
+                }
+            }
+        }
+    }
 
     fun attachSession(connected: P2pLanTransport.SecureSession, label: String) {
         session?.close()
         session = connected
         activePeerId = connected.remoteDeviceId
+        receivedFiles.clear()
+        runCatching { receivedFileStore.list() }.onSuccess { receivedFiles.addAll(it) }
         history.clear()
         try {
             conversationStore.list(connected.remoteDeviceId).forEach { saved ->
@@ -84,10 +177,30 @@ fun P2pChatScreen(
             error = failure.message ?: "Impossible de lire l’historique chiffré."
         }
         status = "Connexion TLS mutuellement authentifiée : $label"
+        val fileAssembler = IncomingFileAssembler()
         thread(name = "aegis-p2p-reader", isDaemon = true) {
             try {
                 while (connected.isOpen) {
                     val frame = connected.readFrame()
+                    if (P2pFileTransferCodec.isFilePacket(frame)) {
+                        val packet = P2pFileTransferCodec.decode(frame)
+                        frame.fill(0)
+                        val completed = fileAssembler.accept(packet)
+                        if (completed != null) {
+                            try {
+                                receivedFileStore.save(completed.transferId, completed.fileName, completed.mimeType, completed.bytes)
+                            } finally {
+                                completed.bytes.fill(0)
+                                completed.sha256.fill(0)
+                            }
+                            mainHandler.post {
+                                receivedFiles.clear()
+                                receivedFiles.addAll(receivedFileStore.list())
+                                status = "Fichier reçu et conservé dans le coffre chiffré."
+                            }
+                        }
+                        continue
+                    }
                     val decoded = P2pWireCodec.decodeText(frame)
                     frame.fill(0)
                     if (decoded != null) {
@@ -103,6 +216,7 @@ fun P2pChatScreen(
                     }
                 }
             } catch (failure: Exception) {
+                fileAssembler.cancel()
                 mainHandler.post {
                     if (session === connected) {
                         session = null
@@ -257,6 +371,27 @@ fun P2pChatScreen(
             label = { Text("Message") },
             enabled = session != null
         )
+        Button(
+            onClick = { importLauncher.launch(arrayOf("*/*")) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = session != null,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10233B), contentColor = Color(0xFF00BFFF))
+        ) { Text("ENVOYER UN FICHIER (20 MIO MAX.)") }
+
+        if (receivedFiles.isNotEmpty()) {
+            Text("FICHIERS REÇUS — COFFRE CHIFFRÉ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+            receivedFiles.forEach { file ->
+                Button(
+                    onClick = {
+                        pendingExportId = file.id
+                        exportLauncher.launch(file.fileName)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10233B), contentColor = Color(0xFF00BFFF))
+                ) { Text("EXPORTER • ${file.fileName} • ${file.size / 1024} Kio") }
+            }
+        }
+
         Button(
             onClick = {
                 val current = session ?: return@Button
