@@ -229,25 +229,7 @@ fun P2pChatScreen(
                     } ?: throw IllegalStateException("Impossible de lire le fichier sélectionné.")
                     fileBytes = bytes
                     require(bytes.isNotEmpty()) { "Fichier vide." }
-                    val transferId = UUID.randomUUID().toString()
-                    current.sendFrame(P2pFileTransferCodec.encodeStart(
-                        P2pFileTransferCodec.Packet.Start(transferId, safeName, mime, bytes.size.toLong())
-                    ))
-                    var index = 0
-                    var offset = 0
-                    while (offset < bytes.size) {
-                        val end = minOf(offset + P2pFileTransferCodec.CHUNK_BYTES, bytes.size)
-                        val chunk = bytes.copyOfRange(offset, end)
-                        val frame = P2pFileTransferCodec.encodeChunk(transferId, index, chunk)
-                        current.sendFrame(frame)
-                        chunk.fill(0)
-                        frame.fill(0)
-                        offset = end
-                        index++
-                    }
-                    val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
-                    fileDigest = digest
-                    current.sendFrame(P2pFileTransferCodec.encodeFinish(transferId, digest))
+                    sendFileBytes(current, safeName, mime, bytes)
                     mainHandler.post { status = "Fichier transmis : $safeName"; error = null }
                 } catch (failure: Exception) {
                     mainHandler.post { error = failure.message ?: "Transfert de fichier impossible." }
@@ -556,6 +538,47 @@ fun P2pChatScreen(
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF26313E), contentColor = Color.White),
             shape = RoundedCornerShape(10.dp)
         ) { Text("RETOUR") }
+    }
+}
+
+
+private fun sendFileBytes(
+    session: P2pLanTransport.SecureSession,
+    fileName: String,
+    mimeType: String,
+    bytes: ByteArray
+) {
+    require(bytes.isNotEmpty() && bytes.size.toLong() <= P2pFileTransferCodec.MAX_FILE_BYTES) {
+        "Fichier vide ou supérieur à 20 Mio."
+    }
+    var digest: ByteArray? = null
+    try {
+        val transferId = UUID.randomUUID().toString()
+        session.sendFrame(
+            P2pFileTransferCodec.encodeStart(
+                P2pFileTransferCodec.Packet.Start(transferId, fileName, mimeType, bytes.size.toLong())
+            )
+        )
+        var index = 0
+        var offset = 0
+        while (offset < bytes.size) {
+            val end = minOf(offset + P2pFileTransferCodec.CHUNK_BYTES, bytes.size)
+            val chunk = bytes.copyOfRange(offset, end)
+            val frame = P2pFileTransferCodec.encodeChunk(transferId, index, chunk)
+            try {
+                session.sendFrame(frame)
+            } finally {
+                chunk.fill(0)
+                frame.fill(0)
+            }
+            offset = end
+            index++
+        }
+        digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+        session.sendFrame(P2pFileTransferCodec.encodeFinish(transferId, digest))
+    } finally {
+        digest?.fill(0)
+        bytes.fill(0)
     }
 }
 
