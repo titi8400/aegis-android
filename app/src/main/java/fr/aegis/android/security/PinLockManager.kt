@@ -1,7 +1,6 @@
 package fr.aegis.android.security
 
 import android.content.Context
-import android.os.SystemClock
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
@@ -9,11 +8,7 @@ import javax.crypto.spec.PBEKeySpec
 
 /**
  * Local PIN verifier for the prototype.
- *
- * This stores a salted PBKDF2 verifier, never the PIN itself. SharedPreferences
- * are private to the app but are not an anti-tampering hardware security boundary.
- * A production design must bind access to a Keystore key and validate a
- * hardware-backed, rollback-resistant attempt policy.
+ * Private app preferences are not an anti-tampering boundary.
  */
 class PinLockManager(context: Context) {
     private val prefs = context.getSharedPreferences("aegis_local_lock_v1", Context.MODE_PRIVATE)
@@ -29,17 +24,23 @@ class PinLockManager(context: Context) {
 
     @Synchronized
     fun configure(pin: CharArray) {
-        require(pin.size in MIN_PIN_LENGTH..MAX_PIN_LENGTH) { "Le code PIN doit contenir 6 à 12 chiffres." }
-        require(pin.all { it in '0'..'9' }) { "Le code PIN doit contenir uniquement des chiffres." }
+        require(pin.size in MIN_PIN_LENGTH..MAX_PIN_LENGTH) {
+            "Le code PIN doit contenir 6 à 12 chiffres."
+        }
+        require(pin.all { it in '0'..'9' }) {
+            "Le code PIN doit contenir uniquement des chiffres."
+        }
 
-        val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
+        val salt = ByteArray(SALT_BYTES).also { SecureRandom().nextBytes(it) }
         val hash = derive(pin, salt)
-        prefs.edit()
-            .putString(KEY_SALT, salt.toHex())
-            .putString(KEY_HASH, hash.toHex())
-            .putInt(KEY_FAILURES, 0)
-            .putLong(KEY_LOCK_UNTIL, 0L)
-            .commit()
+        check(
+            prefs.edit()
+                .putString(KEY_SALT, salt.toHex())
+                .putString(KEY_HASH, hash.toHex())
+                .putInt(KEY_FAILURES, 0)
+                .putLong(KEY_LOCK_UNTIL, 0L)
+                .commit()
+        ) { "Impossible d'enregistrer le verrouillage PIN." }
     }
 
     @Synchronized
@@ -47,8 +48,8 @@ class PinLockManager(context: Context) {
         val salt = prefs.getString(KEY_SALT, null)?.hexToBytes() ?: return Verification.Rejected
         val expected = prefs.getString(KEY_HASH, null)?.hexToBytes() ?: return Verification.Rejected
 
-        val lockUntil = prefs.getLong(KEY_LOCK_UNTIL, 0L)
         val now = System.currentTimeMillis()
+        val lockUntil = prefs.getLong(KEY_LOCK_UNTIL, 0L)
         if (now < lockUntil) return Verification.Locked(lockUntil - now)
 
         val candidate = derive(pin, salt)
@@ -63,7 +64,12 @@ class PinLockManager(context: Context) {
             return Verification.IdentityWipeRequired
         }
 
-        val delaySeconds = if (failures < 5) 0L else (30L shl (failures - 5)).coerceAtMost(MAX_LOCK_SECONDS)
+        val delaySeconds = if (failures < 5) {
+            0L
+        } else {
+            (30L * Math.pow(2.0, (failures - 5).toDouble()).toLong())
+                .coerceAtMost(MAX_LOCK_SECONDS)
+        }
         val until = if (delaySeconds == 0L) 0L else now + delaySeconds * 1_000L
         prefs.edit()
             .putInt(KEY_FAILURES, failures)
@@ -87,7 +93,8 @@ class PinLockManager(context: Context) {
         }
     }
 
-    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+    private fun ByteArray.toHex(): String =
+        joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private fun String.hexToBytes(): ByteArray {
         require(length % 2 == 0)
