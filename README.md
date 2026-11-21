@@ -4,7 +4,7 @@ AEGIS est un projet de communication Android de pair à pair (P2P), destiné à 
 
 ## État du projet
 
-**Version 0.6.0 — prototype en développement.** Le dépôt contient une application Android native Kotlin/Jetpack Compose, un écran de verrouillage PIN/biométrie et une première primitive d'identité avec Android Keystore. Ce n'est pas encore une messagerie opérationnelle ni un produit audité.
+**Version 0.7.0 — prototype en développement.** Le dépôt contient une application Android native Kotlin/Jetpack Compose, un écran de verrouillage PIN/biométrie et une première primitive d'identité avec Android Keystore. Ce n'est pas encore une messagerie opérationnelle ni un produit audité.
 
 ## Fonctions présentes dans le prototype
 
@@ -20,7 +20,8 @@ AEGIS est un projet de communication Android de pair à pair (P2P), destiné à 
 - Scan des QR d'invitation avec CameraX et ML Kit, après autorisation caméra.
 - Vérification locale de la signature, rejet des clés EC qui ne sont pas P-256 et calcul de l'empreinte SHA-256 de la clé publique.
 - Primitives de défi-réponse ECDSA signées pour démontrer la possession des clés des deux appareils.
-- Historique anti-rejeu persistant et chiffré pour les nonces consommés.
+- Historique anti-rejeu persistant et chiffré pour les invitations consommées.
+- Répertoire local des appareils de confiance, chiffré, conçu pour n’enregistrer un pair qu’après une preuve d’appairage mutuel et la comparaison indépendante des deux empreintes.
 
 **Attention :** la suppression après 10 échecs concerne uniquement l'identité cryptographique de ce prototype. Elle ne constitue pas un effacement garanti de toutes les données du téléphone. Le compteur local est modifiable par un attaquant ayant le contrôle de l'appareil, pouvant effacer les données de l'application ou restaurer un état antérieur. Le coffre de fichiers chiffrés est disponible comme primitive technique, mais il n'est pas encore relié à une base de messages ni à l'interface.
 
@@ -61,7 +62,7 @@ Ouvrir le dossier dans Android Studio, avec JDK 17 et Gradle 8.11.1 ou compatibl
 ## Étapes prévues
 
 1. Socle Android, interface et primitives locales.
-2. Terminer l'appairage mutuel QR : comparaison des deux empreintes, échange effectif des défis/réponses entre appareils et enregistrement chiffré des appareils approuvés.
+2. Terminer l'appairage mutuel QR : comparaison des deux empreintes, échange effectif des défis/réponses entre appareils et raccordement de l’interface au répertoire chiffré des appareils approuvés.
 3. Intégrer le coffre chiffré, puis transport P2P local et échanges de messages.
 4. Transport Internet direct, avec indication claire des limites de connectivité.
 5. Audio/vidéo direct et fichiers.
