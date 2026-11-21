@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 @Composable
 fun PairingQrScanner(
-    onInviteScanned: (String) -> Unit,
+    onPayloadScanned: (String) -> Unit,
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
@@ -111,8 +111,8 @@ fun PairingQrScanner(
                                     InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
                                 ).addOnSuccessListener { barcodes ->
                                     val raw = barcodes.firstNotNullOfOrNull { it.rawValue }
-                                    if (raw != null && raw.startsWith("AEGIS-PAIR|") && delivered.compareAndSet(false, true)) {
-                                        onInviteScanned(raw)
+                                    if (raw != null && (raw.startsWith("AEGIS-PAIR|") || raw.startsWith("AEGIS-CHALLENGE|") || raw.startsWith("AEGIS-RESPONSE|")) && delivered.compareAndSet(false, true)) {
+                                        onPayloadScanned(raw)
                                     }
                                 }.addOnFailureListener {
                                     scanError = "Lecture du QR impossible."
