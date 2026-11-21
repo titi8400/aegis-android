@@ -49,6 +49,8 @@ class P2pCallEngine(
     private var pendingOffer: P2pCallSignalCodec.Signal.Offer? = null
     private var remoteDescriptionSet = false
     private val pendingCandidates = CopyOnWriteArrayList<IceCandidate>()
+    private val pendingLocalCandidates = CopyOnWriteArrayList<IceCandidate>()
+    private var localDescriptionSignaled = false
     private var audioSource: AudioSource? = null
     private var audioTrack: AudioTrack? = null
     private var videoSource: VideoSource? = null
@@ -101,6 +103,8 @@ class P2pCallEngine(
                 peerConnection?.setLocalDescription(object : SdpObserverAdapter() {
                     override fun onSetSuccess() {
                         sendSignal(P2pCallSignalCodec.Signal.Offer(id, description.description))
+                        localDescriptionSignaled = true
+                        flushLocalCandidates()
                     }
                     override fun onSetFailure(error: String?) = fail("Impossible d'appliquer l'offre : $error")
                 }, description)
@@ -191,6 +195,8 @@ class P2pCallEngine(
                 peerConnection?.setLocalDescription(object : SdpObserverAdapter() {
                     override fun onSetSuccess() {
                         sendSignal(P2pCallSignalCodec.Signal.Answer(id, description.description))
+                        localDescriptionSignaled = true
+                        flushLocalCandidates()
                     }
                     override fun onSetFailure(error: String?) = fail("Impossible d'appliquer la réponse : $error")
                 }, description)
@@ -226,11 +232,8 @@ class P2pCallEngine(
             override fun onIceCandidate(candidate: IceCandidate?) {
                 val id = callId ?: return
                 if (candidate != null) {
-                    sendSignal(
-                        P2pCallSignalCodec.Signal.Candidate(
-                            id, candidate.sdpMid, candidate.sdpMLineIndex, candidate.sdp
-                        )
-                    )
+                    if (localDescriptionSignaled) sendIceCandidate(id, candidate)
+                    else pendingLocalCandidates.add(candidate)
                 }
             }
             override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) = Unit
@@ -289,6 +292,20 @@ class P2pCallEngine(
         pendingCandidates.clear()
     }
 
+    private fun flushLocalCandidates() {
+        val id = callId ?: return
+        pendingLocalCandidates.forEach { sendIceCandidate(id, it) }
+        pendingLocalCandidates.clear()
+    }
+
+    private fun sendIceCandidate(id: String, candidate: IceCandidate) {
+        sendSignal(
+            P2pCallSignalCodec.Signal.Candidate(
+                id, candidate.sdpMid, candidate.sdpMLineIndex, candidate.sdp
+            )
+        )
+    }
+
     private fun sendSignal(signal: P2pCallSignalCodec.Signal) {
         try {
             sendSignalFrame(P2pCallSignalCodec.encode(signal))
@@ -325,6 +342,8 @@ class P2pCallEngine(
         peerConnection?.dispose()
         peerConnection = null
         pendingCandidates.clear()
+        pendingLocalCandidates.clear()
+        localDescriptionSignaled = false
         remoteDescriptionSet = false
         callId = null
     }
