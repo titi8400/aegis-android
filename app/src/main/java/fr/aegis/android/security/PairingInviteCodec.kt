@@ -49,7 +49,7 @@ object PairingInviteCodec {
     )
 
     fun create(
-        identity: AndroidKeyStoreIdentity,
+        identity: SigningIdentity,
         nowEpochMs: Long = System.currentTimeMillis(),
         nonce: ByteArray = randomNonce()
     ): String {
