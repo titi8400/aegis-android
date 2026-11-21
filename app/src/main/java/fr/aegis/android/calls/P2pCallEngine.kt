@@ -52,6 +52,7 @@ class P2pCallEngine(
     private var audioTrack: AudioTrack? = null
     private var videoSource: VideoSource? = null
     private var videoTrack: VideoTrack? = null
+    private var remoteVideoTrack: VideoTrack? = null
     private var cameraCapturer: CameraVideoCapturer? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
     private var localRenderer: SurfaceViewRenderer? = null
@@ -77,7 +78,7 @@ class P2pCallEngine(
         local.setMirror(true)
         remote.setMirror(false)
         videoTrack?.addSink(local)
-        videoTrack?.let { track -> if (remoteRenderer != null) track.addSink(remoteRenderer) }
+        remoteVideoTrack?.addSink(remote)
     }
 
     fun startOutgoingCall() {
@@ -259,7 +260,9 @@ class P2pCallEngine(
     }
 
     private fun attachRemoteVideo(track: VideoTrack) {
-        remoteRenderer?.let { renderer -> track.addSink(renderer) }
+        remoteVideoTrack?.let { old -> remoteRenderer?.let(old::removeSink) }
+        remoteVideoTrack = track
+        remoteRenderer?.let(track::addSink)
     }
 
     private fun flushPendingCandidates() {
@@ -286,9 +289,11 @@ class P2pCallEngine(
         runCatching { cameraCapturer?.stopCapture() }
         runCatching { cameraCapturer?.dispose() }
         cameraCapturer = null
-        runCatching { videoTrack?.let { track -> localRenderer?.let(track::removeSink); remoteRenderer?.let(track::removeSink) } }
+        runCatching { videoTrack?.let { track -> localRenderer?.let(track::removeSink) } }
+        runCatching { remoteVideoTrack?.let { track -> remoteRenderer?.let(track::removeSink) } }
         videoTrack?.dispose()
         videoTrack = null
+        remoteVideoTrack = null
         videoSource?.dispose()
         videoSource = null
         surfaceTextureHelper?.dispose()
