@@ -57,9 +57,9 @@ object PairingInviteCodec {
         require(identity.exists()) { "Identité AEGIS non initialisée" }
         require(nonce.size == NONCE_BYTES) { "Nonce invalide" }
 
+        val publicKey = identity.publicKeyEncoded()
         val deviceId = deviceIdForPublicKey(publicKey)
         val expiresAt = Math.addExact(nowEpochMs, MAX_LIFETIME_MS)
-        val publicKey = identity.publicKeyEncoded()
         val unsigned = canonical(deviceId, nowEpochMs, expiresAt, nonce, publicKey)
         val signature = identity.sign(unsigned)
         return listOf(
