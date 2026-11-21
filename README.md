@@ -4,7 +4,7 @@ AEGIS est une application Android native de communication privée, conçue autou
 
 ## État actuel
 
-**Version 0.11.0 — prototype P2P sur réseau local.**
+**Version 0.12.0 — prototype P2P sur réseau local.**
 
 | Brique | État |
 |---|---|
@@ -14,7 +14,7 @@ AEGIS est une application Android native de communication privée, conçue autou
 | Registre local chiffré des appareils approuvés | Implémenté |
 | Découverte des appareils approuvés sur le même LAN | Implémentée |
 | Connexion TCP directe avec TLS mutuel et épinglage de clés | Implémentée dans le code |
-| Échange de messages texte sur cette connexion | Interface et transport implémentés |
+| Échange de messages texte sur cette connexion | Interface et transport implémentés |\n| Transfert de fichiers directs (20 Mio maximum) | Implémenté avec blocs de 512 Kio et contrôle SHA-256 |\n| Stockage local des fichiers reçus | Chiffré AES-256-GCM |
 | Historique local par pair chiffré AES-256-GCM | Implémenté |
 | Messages texte éphémères (1 min, 1 h, 24 h) | Implémentés avec purge locale périodique |
 | Messages persistants chiffrés | À intégrer |
@@ -58,7 +58,7 @@ L'invitation expire après cinq minutes ; le défi et la réponse après 90 seco
 4. L'écran recherche les appareils de confiance via des annonces UDP locales.
 5. Sur l'un des appareils, active « Attendre un pair ».
 6. Sur l'autre, sélectionne l'appareil détecté puis appuie sur « Connecter ».
-7. Après validation du certificat et de la clé épinglée par TLS mutuel, les messages texte peuvent être échangés directement.
+7. Après validation du certificat et de la clé épinglée par TLS mutuel, les messages texte et fichiers peuvent être échangés directement. Les fichiers sont limités à 20 Mio ; ils sont assemblés en mémoire, vérifiés par SHA-256 puis enregistrés dans le coffre chiffré.
 
 Le port TCP est 39841 et le port UDP de découverte est 39842. Ces ports ne sont utilisés que sur le réseau local. La découverte UDP est une indication de présence, jamais une preuve d'identité ; seule la négociation TLS mutuellement authentifiée autorise la session.
 
@@ -91,7 +91,7 @@ La CI GitHub exécute les tests unitaires JVM puis construit l'APK Debug. L'APK 
 
 1. Valider le transport TLS sur plusieurs versions et fabricants Android.
 2. Ajouter une vraie couche de messages avec stockage local chiffré, gestion des accusés et des interruptions.
-3. Ajouter les transferts de fichiers par blocs, reprise et limites de taille.
+3. Ajouter la reprise des transferts de fichiers interrompus et les accusés de réception.
 4. Concevoir appels audio/vidéo directs sans serveur ni relais, en documentant les limites NAT.
 5. Concevoir la récupération par second appareil sans exporter de clé privée.
 6. Faire réaliser une revue cryptographique et un audit indépendant avant utilisation réelle.
