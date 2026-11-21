@@ -1,6 +1,9 @@
 package fr.aegis.android.security
 
-import org.json.JSONObject
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.StandardCharsets
+import java.util.Base64
 import java.util.UUID
 
 /** Versioned application-message envelope carried inside the authenticated TLS stream. */
@@ -24,36 +27,46 @@ object P2pWireCodec {
         require(expiresAtEpochMs == null || expiresAtEpochMs > createdAtEpochMs) {
             "Expiration de message invalide."
         }
-        return JSONObject()
-            .put("magic", MAGIC)
-            .put("version", VERSION)
-            .put("type", TYPE_TEXT)
-            .put("id", id)
-            .put("createdAt", createdAtEpochMs)
-            .put("expiresAt", expiresAtEpochMs ?: JSONObject.NULL)
-            .put("body", body)
-            .toString()
-            .toByteArray(Charsets.UTF_8)
+        val encodedBody = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(body.toByteArray(StandardCharsets.UTF_8))
+        val expires = expiresAtEpochMs?.toString() ?: "-"
+        return "$PREFIX|$VERSION|$id|$createdAtEpochMs|$expires|$encodedBody"
+            .toByteArray(StandardCharsets.US_ASCII)
     }
 
+    /** Returns null for an expired ephemeral message; malformed frames are rejected. */
     fun decodeText(frame: ByteArray, nowEpochMs: Long = System.currentTimeMillis()): TextMessage? {
         require(frame.isNotEmpty() && frame.size <= MAX_FRAME_BYTES) { "Trame AEGIS invalide." }
-        val json = JSONObject(frame.toString(Charsets.UTF_8))
-        require(json.getString("magic") == MAGIC && json.getInt("version") == VERSION) {
-            "Version de message AEGIS non prise en charge."
+        val raw = String(frame, StandardCharsets.US_ASCII)
+        val fields = raw.split('|', limit = 6)
+        require(fields.size == 6 && fields[0] == PREFIX && fields[1] == VERSION) {
+            "Version ou format de message AEGIS non pris en charge."
         }
-        require(json.getString("type") == TYPE_TEXT) { "Type de message non pris en charge." }
-        val id = json.getString("id")
+        val id = fields[2]
         validateUuid(id)
-        val createdAt = json.getLong("createdAt")
+        val createdAt = fields[3].toLongOrNull()
+            ?: throw IllegalArgumentException("Date de message invalide.")
         require(createdAt in 1L..(nowEpochMs + CLOCK_SKEW_MS)) { "Date de message invalide." }
-        val expiresAt = if (json.isNull("expiresAt")) null else json.getLong("expiresAt")
+        val expiresAt = if (fields[4] == "-") null else fields[4].toLongOrNull()
+            ?: throw IllegalArgumentException("Expiration de message invalide.")
         require(expiresAt == null || expiresAt > createdAt) { "Expiration de message invalide." }
         if (expiresAt != null) {
             require(expiresAt - createdAt <= MAX_TTL_MS) { "Durée de conservation excessive." }
             if (expiresAt <= nowEpochMs) return null
         }
-        val body = json.getString("body")
+        val bodyBytes = Base64.getUrlDecoder().decode(fields[5])
+        require(bodyBytes.isNotEmpty() && bodyBytes.size <= MAX_BODY_BYTES) {
+            "Contenu de message trop volumineux."
+        }
+        val body = try {
+            StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bodyBytes))
+                .toString()
+        } finally {
+            bodyBytes.fill(0)
+        }
         validateBody(body)
         return TextMessage(id, body, createdAt, expiresAt)
     }
@@ -70,10 +83,10 @@ object P2pWireCodec {
         }
     }
 
-    private const val MAGIC = "AEGIS"
-    private const val VERSION = 1
-    private const val TYPE_TEXT = "text"
+    private const val PREFIX = "AEGIS-TEXT"
+    private const val VERSION = "1"
     private const val MAX_BODY_CHARS = 4_096
+    private const val MAX_BODY_BYTES = 16 * 1024
     private const val MAX_FRAME_BYTES = 32 * 1024
     private const val CLOCK_SKEW_MS = 30_000L
     private const val MAX_TTL_MS = 30L * 24L * 60L * 60L * 1000L
