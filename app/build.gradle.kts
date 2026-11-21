@@ -16,6 +16,12 @@ android {
         versionName = "0.10.0"
     }
 
+    packaging {
+        resources {
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
