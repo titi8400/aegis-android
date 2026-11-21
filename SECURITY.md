@@ -16,7 +16,8 @@ AEGIS est un prototype Android. La version 0.11 contient un appairage QR hors li
 - Appareils de confiance conservés dans le coffre local AES-256-GCM.
 - Pour la liaison LAN, certificat TLS temporaire signé avec la clé Android Keystore, authentification mutuelle et vérification par épinglage exact des clés publiques enregistrées.
 - Les trames du transport sont limitées à 1 Mio.
-- L'historique local par appareil et par pair est conservé dans le coffre AES-256-GCM ; il n'est pas synchronisé automatiquement.\n- Les messages texte peuvent porter une date d'expiration locale (1 minute, 1 heure ou 24 heures) ; leur purge dépend de l'exécution de l'application et ne peut pas effacer les copies déjà consultées, exportées ou capturées par le destinataire.
+- L'historique local par appareil et par pair est conservé dans le coffre AES-256-GCM ; il n'est pas synchronisé automatiquement.
+- Les messages texte peuvent porter une date d'expiration locale (1 minute, 1 heure ou 24 heures) ; leur purge dépend de l'exécution de l'application et ne peut pas effacer les copies déjà consultées, exportées ou capturées par le destinataire.
 
 ## Limites connues
 
