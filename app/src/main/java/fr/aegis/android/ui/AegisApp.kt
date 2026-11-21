@@ -56,6 +56,7 @@ import fr.aegis.android.security.AndroidKeyStoreIdentity
 import fr.aegis.android.security.PinLockManager
 import fr.aegis.android.security.PairingInviteCodec
 import fr.aegis.android.security.PairingQrGenerator
+import fr.aegis.android.security.PairingReplayGuard
 import kotlinx.coroutines.delay
 
 private val Background = Color(0xFF080C12)
@@ -73,6 +74,7 @@ fun AegisApp() {
     val lifecycleOwner = LocalLifecycleOwner.current
     val identity = remember { AndroidKeyStoreIdentity() }
     val pinLock = remember { PinLockManager(context.applicationContext) }
+    val replayGuard = remember { PairingReplayGuard(context.applicationContext) }
 
     var pinConfigured by remember { mutableStateOf(pinLock.isConfigured()) }
     var unlocked by remember { mutableStateOf(false) }
@@ -336,6 +338,7 @@ fun AegisApp() {
                     onInviteScanned = { payload ->
                         try {
                             val verified = PairingInviteCodec.verify(payload)
+                            replayGuard.consume("invite", verified.nonce, verified.expiresAtEpochMs)
                             scannedFingerprint = verified.fingerprintSha256
                             pairingError = null
                         } catch (error: Exception) {
