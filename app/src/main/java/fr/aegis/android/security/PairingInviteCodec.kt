@@ -1,5 +1,6 @@
 package fr.aegis.android.security
 
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.security.KeyFactory
 import java.security.MessageDigest
@@ -56,7 +57,7 @@ object PairingInviteCodec {
         require(identity.exists()) { "Identité AEGIS non initialisée" }
         require(nonce.size == NONCE_BYTES) { "Nonce invalide" }
 
-        val deviceId = UUID.randomUUID().toString()
+        val deviceId = deviceIdForPublicKey(publicKey)
         val expiresAt = Math.addExact(nowEpochMs, MAX_LIFETIME_MS)
         val publicKey = identity.publicKeyEncoded()
         val unsigned = canonical(deviceId, nowEpochMs, expiresAt, nonce, publicKey)
@@ -119,6 +120,16 @@ object PairingInviteCodec {
             publicKeyEncoded = publicKey,
             fingerprintSha256 = fingerprint(publicKey)
         )
+    }
+
+    /** Stable device identifier derived from the public identity key (UUIDv8 layout). */
+    fun deviceIdForPublicKey(publicKeyEncoded: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(publicKeyEncoded)
+        val buffer = ByteBuffer.wrap(digest)
+        val most = (buffer.long and 0xffffffffffff0fffUL.toLong()) or 0x0000000000008000L
+        val least = (buffer.long and 0x3fffffffffffffffL) or Long.MIN_VALUE
+        digest.fill(0)
+        return UUID(most, least).toString()
     }
 
     fun fingerprint(publicKeyEncoded: ByteArray): String =
