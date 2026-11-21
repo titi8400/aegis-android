@@ -443,7 +443,12 @@ fun P2pChatScreen(
                     if (delivered > 0) status = "$delivered message(s) en attente transmis."
                 }
             } catch (failure: Exception) {
+                connected.close()
                 mainHandler.post {
+                    if (session === connected) {
+                        session = null
+                        status = "Liaison interrompue pendant la livraison ; les messages restent en attente."
+                    }
                     pendingOutboxCount = runCatching { outboxStore.list(connected.remoteDeviceId).size }.getOrDefault(0)
                     error = failure.message ?: "Transmission de la file d'attente impossible."
                 }
@@ -499,12 +504,24 @@ fun P2pChatScreen(
                             messageId = decoded.id,
                             createdAtEpochMs = decoded.createdAtEpochMs
                         )
-                        connected.sendFrame(P2pWireCodec.encodeAck(decoded.id))
-                        mainHandler.post { history.add(ChatLine(false, decoded.body, decoded.expiresAtEpochMs != null)) }
+                        val acknowledgementFrame = P2pWireCodec.encodeAck(decoded.id)
+                        try {
+                            connected.sendFrame(acknowledgementFrame)
+                        } finally {
+                            acknowledgementFrame.fill(0)
+                        }
+                        mainHandler.post {
+                            history.clear()
+                            conversationStore.list(connected.remoteDeviceId).forEach { saved ->
+                                history.add(ChatLine(saved.outgoing, saved.body, saved.expiresAtEpochMs != null))
+                            }
+                        }
                     }
                 }
             } catch (failure: Exception) {
                 fileAssembler.cancel()
+                pendingAcks.values.forEach { it.completeExceptionally(failure) }
+                pendingAcks.clear()
                 mainHandler.post {
                     if (session === connected) {
                         session = null
