@@ -79,6 +79,7 @@ fun AegisApp() {
     }
     var identityError by remember { mutableStateOf<String?>(null) }
     var pairingOpen by remember { mutableStateOf(false) }
+    var networkOpen by remember { mutableStateOf(false) }
     var lastInteraction by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
 
     DisposableEffect(lifecycleOwner, pinConfigured) {
@@ -324,6 +325,8 @@ fun AegisApp() {
                 }
             } else if (pairingOpen) {
                 PairingWizard(identity = identity, onClose = { pairingOpen = false })
+            } else if (networkOpen) {
+                P2pChatScreen(identity = identity, onClose = { networkOpen = false })
             } else {
                 Text(
                     text = "COMMUNICATION PRIVÉE",
@@ -396,6 +399,13 @@ fun AegisApp() {
                         }
                         Spacer(Modifier.height(12.dp))
                         Button(
+                            onClick = { networkOpen = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Color(0xFF00131D)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) { Text("OUVRIR LA MESSAGERIE P2P LOCALE") }
+                        Spacer(Modifier.height(8.dp))
+                        Button(
                             onClick = { pairingOpen = true },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = Panel, contentColor = Cyan),
@@ -422,14 +432,14 @@ fun AegisApp() {
 
             Spacer(Modifier.height(28.dp))
             Text(
-                text = "VERSION 0.8.0 • PROTOTYPE",
+                text = "VERSION 0.9.0 • PROTOTYPE",
                 color = Muted,
                 fontSize = 10.sp,
                 letterSpacing = 1.5.sp
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Appairage QR hors ligne avec authentification mutuelle.",
+                text = "Liaison directe TLS sur réseau local, sans relais.",
                 color = Muted,
                 fontSize = 10.sp
             )
