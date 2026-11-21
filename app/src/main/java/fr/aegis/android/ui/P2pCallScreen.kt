@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.view.Gravity
 import android.widget.FrameLayout
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +38,7 @@ fun P2pCallScreen(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
+    BackHandler(enabled = true, onBack = onClose)
     var started by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
