@@ -229,9 +229,11 @@ class P2pCallEngine(
 
     private fun addLocalMedia() {
         if (audioTrack == null) {
-            audioSource = factory.createAudioSource(MediaConstraints())
-            audioTrack = factory.createAudioTrack("aegis-audio", audioSource)
-            peerConnection?.addTrack(audioTrack, listOf("aegis-stream"))
+            val source = factory.createAudioSource(MediaConstraints())
+            val track = factory.createAudioTrack("aegis-audio", source)
+            audioSource = source
+            audioTrack = track
+            peerConnection?.addTrack(track, listOf("aegis-stream"))
         }
         if (videoTrack == null && hasPermission(Manifest.permission.CAMERA)) {
             val enumerator = Camera2Enumerator(appContext)
@@ -241,13 +243,16 @@ class P2pCallEngine(
                 val capturer = enumerator.createCapturer(cameraName, null)
                 if (capturer != null) {
                     cameraCapturer = capturer
-                    videoSource = factory.createVideoSource(false)
-                    surfaceTextureHelper = SurfaceTextureHelper.create("AegisCamera", egl.eglBaseContext)
-                    capturer.initialize(surfaceTextureHelper, appContext, videoSource?.capturerObserver)
+                    val source = factory.createVideoSource(false)
+                    val textureHelper = SurfaceTextureHelper.create("AegisCamera", egl.eglBaseContext)
+                    videoSource = source
+                    surfaceTextureHelper = textureHelper
+                    capturer.initialize(textureHelper, appContext, source.capturerObserver)
                     capturer.startCapture(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS)
-                    videoTrack = factory.createVideoTrack("aegis-video", videoSource)
-                    localRenderer?.let { videoTrack?.addSink(it) }
-                    peerConnection?.addTrack(videoTrack, listOf("aegis-stream"))
+                    val track = factory.createVideoTrack("aegis-video", source)
+                    videoTrack = track
+                    localRenderer?.let(track::addSink)
+                    peerConnection?.addTrack(track, listOf("aegis-stream"))
                 }
             }
         }
