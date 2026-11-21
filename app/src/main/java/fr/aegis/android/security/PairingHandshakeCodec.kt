@@ -37,12 +37,18 @@ object PairingHandshakeCodec {
         val challengerFingerprint: String
     )
 
-    data class VerifiedHandshake(
+    data class VerifiedHandshake internal constructor(
         val inviteDeviceId: String,
         val challengerDeviceId: String,
+        val challengerPublicKey: ByteArray,
         val responderPublicKey: ByteArray,
         val responderFingerprint: String,
         val transcriptSha256: String
+    )
+
+    data class ResponsePackage(
+        val encoded: String,
+        val proof: VerifiedHandshake
     )
 
     fun createChallenge(
@@ -110,7 +116,13 @@ object PairingHandshakeCodec {
         challenge: VerifiedChallenge,
         responderInvite: PairingInviteCodec.VerifiedInvite,
         responderIdentity: AndroidKeyStoreIdentity
-    ): String {
+    ): String = createResponsePackage(challenge, responderInvite, responderIdentity).encoded
+
+    fun createResponsePackage(
+        challenge: VerifiedChallenge,
+        responderInvite: PairingInviteCodec.VerifiedInvite,
+        responderIdentity: AndroidKeyStoreIdentity
+    ): ResponsePackage {
         require(challenge.inviteDeviceId == responderInvite.deviceId) { "Défi destiné à une autre identité" }
         require(System.currentTimeMillis() <= challenge.createdAtEpochMs + VALIDITY_MS) { "Défi expiré" }
         require(MessageDigest.isEqual(challenge.inviteNonce, responderInvite.nonce)) { "Nonce d’invitation incorrect" }
@@ -124,11 +136,21 @@ object PairingHandshakeCodec {
             challenge.challengeNonce, responderNonce, publicKey
         )
         val signature = responderIdentity.sign(unsigned)
-        return listOf(
+        val encoded = listOf(
             PREFIX_RESPONSE, VERSION, challenge.inviteDeviceId, encode(challenge.inviteNonce),
             challenge.challengerDeviceId, encode(challenge.challengeNonce),
             encode(responderNonce), encode(publicKey), encode(signature)
         ).joinToString("|")
+        val transcript = unsigned + signature
+        val proof = VerifiedHandshake(
+            inviteDeviceId = challenge.inviteDeviceId,
+            challengerDeviceId = challenge.challengerDeviceId,
+            challengerPublicKey = challenge.challengerPublicKey,
+            responderPublicKey = publicKey,
+            responderFingerprint = PairingInviteCodec.fingerprint(publicKey),
+            transcriptSha256 = MessageDigest.getInstance("SHA-256").digest(transcript).toHex()
+        )
+        return ResponsePackage(encoded, proof)
     }
 
     fun verifyResponse(
@@ -165,6 +187,7 @@ object PairingHandshakeCodec {
         return VerifiedHandshake(
             inviteDeviceId = challenge.inviteDeviceId,
             challengerDeviceId = challenge.challengerDeviceId,
+            challengerPublicKey = challenge.challengerPublicKey,
             responderPublicKey = responderKey,
             responderFingerprint = PairingInviteCodec.fingerprint(responderKey),
             transcriptSha256 = MessageDigest.getInstance("SHA-256").digest(transcript).toHex()
