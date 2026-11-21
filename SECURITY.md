@@ -2,7 +2,7 @@
 
 ## État du produit
 
-AEGIS est un prototype Android. La version 0.12 contient un appairage QR hors ligne et une première liaison TCP sur réseau local avec TLS mutuel et épinglage des clés publiques des appareils approuvés. Cette liaison et la messagerie texte ne sont pas encore validées sur deux téléphones physiques. Ne pas utiliser le prototype pour des communications sensibles.
+AEGIS est un prototype Android. La version 0.13 contient un appairage QR hors ligne et une première liaison TCP sur réseau local avec TLS mutuel et épinglage des clés publiques des appareils approuvés. Cette liaison et la messagerie texte ne sont pas encore validées sur deux téléphones physiques. Ne pas utiliser le prototype pour des communications sensibles.
 
 ## Fonctions de sécurité présentes
 
@@ -18,7 +18,7 @@ AEGIS est un prototype Android. La version 0.12 contient un appairage QR hors li
 - Les trames du transport sont limitées à 1 Mio.
 - L'historique local par appareil et par pair est conservé dans le coffre AES-256-GCM ; il n'est pas synchronisé automatiquement.
 - Les messages texte peuvent porter une date d'expiration locale (1 minute, 1 heure ou 24 heures) ; leur purge dépend de l'exécution de l'application et ne peut pas effacer les copies déjà consultées, exportées ou capturées par le destinataire.
-- Les fichiers reçus sont limités à 20 Mio, assemblés en mémoire, vérifiés par SHA-256 puis chiffrés dans le coffre local. Les blocs incomplets ne sont pas repris ; le contenu existe temporairement en mémoire vive pendant le transfert.
+- Les fichiers reçus sont limités à 20 Mio, assemblés en mémoire, vérifiés par SHA-256 puis chiffrés dans le coffre local. Les blocs incomplets ne sont pas repris ; le contenu existe temporairement en mémoire vive pendant le transfert.\n- Les notes vocales sont enregistrées après autorisation microphone, limitées à 30 secondes et transmises dans le canal TLS direct sous forme de fichier WAV.\n- Le partage de position est déclenché explicitement par l'utilisateur ; les coordonnées sont envoyées comme message texte dans la session TLS. Le destinataire peut les conserver ou les copier.
 
 ## Limites connues
 
