@@ -61,6 +61,10 @@ class P2pCallEngine(
     private var localRenderer: SurfaceViewRenderer? = null
     private var remoteRenderer: SurfaceViewRenderer? = null
     @Volatile private var closed = false
+    @Volatile var microphoneEnabled = true
+        private set
+    @Volatile var cameraEnabled = true
+        private set
 
     init {
         ensureWebRtcInitialized(appContext)
@@ -176,6 +180,16 @@ class P2pCallEngine(
         pendingOffer?.let { sendSignal(P2pCallSignalCodec.Signal.Hangup(it.callId)) }
         closePeerConnection()
         onStateChanged("Appel entrant refusé.")
+    }
+
+    fun setMicrophoneEnabled(enabled: Boolean) {
+        microphoneEnabled = enabled
+        audioTrack?.setEnabled(enabled)
+    }
+
+    fun setCameraEnabled(enabled: Boolean) {
+        cameraEnabled = enabled
+        videoTrack?.setEnabled(enabled)
     }
 
     fun hangUp() {
