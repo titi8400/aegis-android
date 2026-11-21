@@ -1,11 +1,9 @@
 package fr.aegis.android.ui
 
-import android.graphics.Bitmap
 import android.os.SystemClock
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,8 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -54,9 +50,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import fr.aegis.android.security.AndroidKeyStoreIdentity
 import fr.aegis.android.security.PinLockManager
-import fr.aegis.android.security.PairingInviteCodec
-import fr.aegis.android.security.PairingQrGenerator
-import fr.aegis.android.security.PairingReplayGuard
 import kotlinx.coroutines.delay
 
 private val Background = Color(0xFF080C12)
@@ -74,7 +67,6 @@ fun AegisApp() {
     val lifecycleOwner = LocalLifecycleOwner.current
     val identity = remember { AndroidKeyStoreIdentity() }
     val pinLock = remember { PinLockManager(context.applicationContext) }
-    val replayGuard = remember { PairingReplayGuard(context.applicationContext) }
 
     var pinConfigured by remember { mutableStateOf(pinLock.isConfigured()) }
     var unlocked by remember { mutableStateOf(false) }
@@ -86,10 +78,7 @@ fun AegisApp() {
         mutableStateOf(if (identity.exists()) "CRÉÉE" else "NON CRÉÉE")
     }
     var identityError by remember { mutableStateOf<String?>(null) }
-    var scannerOpen by remember { mutableStateOf(false) }
-    var scannedFingerprint by remember { mutableStateOf<String?>(null) }
-    var pairingError by remember { mutableStateOf<String?>(null) }
-    var invitationBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var pairingOpen by remember { mutableStateOf(false) }
     var lastInteraction by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
 
     DisposableEffect(lifecycleOwner, pinConfigured) {
@@ -333,22 +322,8 @@ fun AegisApp() {
                     Spacer(Modifier.height(14.dp))
                     Text(it, color = Danger, fontSize = 11.sp)
                 }
-            } else if (scannerOpen) {
-                PairingQrScanner(
-                    onInviteScanned = { payload ->
-                        try {
-                            val verified = PairingInviteCodec.verify(payload)
-                            replayGuard.consume("invite", verified.nonce, verified.expiresAtEpochMs)
-                            scannedFingerprint = verified.fingerprintSha256
-                            pairingError = null
-                        } catch (error: Exception) {
-                            scannedFingerprint = null
-                            pairingError = error.message ?: "Invitation invalide."
-                        }
-                        scannerOpen = false
-                    },
-                    onClose = { scannerOpen = false }
-                )
+            } else if (pairingOpen) {
+                PairingWizard(identity = identity, onClose = { pairingOpen = false })
             } else {
                 Text(
                     text = "COMMUNICATION PRIVÉE",
@@ -421,52 +396,11 @@ fun AegisApp() {
                         }
                         Spacer(Modifier.height(12.dp))
                         Button(
-                            onClick = {
-                                try {
-                                    check(identity.exists()) { "Initialise d’abord ton identité locale." }
-                                    val invite = PairingInviteCodec.create(identity)
-                                    invitationBitmap = PairingQrGenerator.generate(invite)
-                                    identityError = null
-                                } catch (error: Exception) {
-                                    invitationBitmap = null
-                                    identityError = error.message ?: "Impossible de générer l’invitation."
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Color(0xFF00131D)),
-                            shape = RoundedCornerShape(10.dp)
-                        ) { Text("GÉNÉRER MON QR D’INVITATION") }
-                        invitationBitmap?.let { qr ->
-                            Spacer(Modifier.height(12.dp))
-                            Image(
-                                bitmap = qr.asImageBitmap(),
-                                contentDescription = "QR code d’invitation AEGIS valable cinq minutes",
-                                modifier = Modifier.fillMaxWidth().height(240.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                            Text("QR temporaire : expiration après 5 minutes. Ne le partage qu’avec la personne concernée.", color = Muted, fontSize = 10.sp)
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Button(
-                            onClick = {
-                                scannerOpen = true
-                                scannedFingerprint = null
-                                pairingError = null
-                            },
+                            onClick = { pairingOpen = true },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = Panel, contentColor = Cyan),
                             shape = RoundedCornerShape(10.dp)
-                        ) { Text("SCANNER UN QR D’APPAREIL") }
-                        scannedFingerprint?.let {
-                            Spacer(Modifier.height(12.dp))
-                            Text("INVITATION SIGNÉE VÉRIFIÉE", color = Green, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text("Empreinte SHA-256 : $it", color = Color.White, fontSize = 10.sp)
-                            Text("Compare cette empreinte par un canal indépendant. L’appareil n’est pas encore approuvé.", color = Muted, fontSize = 10.sp)
-                        }
-                        pairingError?.let {
-                            Spacer(Modifier.height(8.dp))
-                            Text("QR REFUSÉ : $it", color = Danger, fontSize = 11.sp)
-                        }
+                        ) { Text("OUVRIR L’ASSISTANT D’APPARIEMENT SÉCURISÉ") }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -495,7 +429,7 @@ fun AegisApp() {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Le scan vérifie une invitation, sans encore approuver l’appareil.",
+                text = "Appairage QR hors ligne avec authentification mutuelle.",
                 color = Muted,
                 fontSize = 10.sp
             )
