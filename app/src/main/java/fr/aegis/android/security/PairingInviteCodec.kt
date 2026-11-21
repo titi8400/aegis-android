@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.Signature
+import java.security.interfaces.ECPublicKey
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 import java.util.UUID
@@ -100,6 +101,9 @@ object PairingInviteCodec {
         val unsigned = canonical(deviceId, createdAt, expiresAt, nonce, publicKey)
 
         val key = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(publicKey))
+        require(key is ECPublicKey) { "La clé d’identité doit être une clé EC" }
+        require(key.params.curve.field.fieldSize == 256 && key.params.order.bitLength() == 256) { "La clé d’identité doit utiliser la courbe NIST P-256" }
+        require(signature.size in 8..MAX_SIGNATURE_BYTES) { "Signature invalide" }
         val valid = Signature.getInstance("SHA256withECDSA").run {
             initVerify(key)
             update(unsigned)
