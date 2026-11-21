@@ -56,7 +56,7 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
     var peerName by remember { mutableStateOf("Appareil de confiance") }
     var fingerprintsCompared by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Aucun appairage en cours.") }
-    var error by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     var peers by remember { mutableStateOf(peerStore.listPeers()) }
 
     fun handleScan(payload: String) {
@@ -97,9 +97,9 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
                 }
                 null -> error("Aucun mode de scan actif.")
             }
-            error = null
+            errorMessage = null
         } catch (failure: Exception) {
-            error = failure.message ?: "Échec de vérification de l’appairage."
+            errorMessage = failure.message ?: "Échec de vérification de l’appairage."
         } finally {
             scanMode = null
         }
@@ -117,7 +117,7 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
         Text("AEGIS / APPARIEMENT", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
         Text("Échange entièrement hors ligne par QR : invitation → défi signé → réponse signée.", color = Color(0xFF8292A3), fontSize = 11.sp)
         Text(status, color = Color(0xFF39D98A), fontSize = 12.sp)
-        error?.let { Text(it, color = Color(0xFFFF7070), fontSize = 11.sp) }
+        errorMessage?.let { Text(it, color = Color(0xFFFF7070), fontSize = 11.sp) }
 
         Button(
             onClick = {
