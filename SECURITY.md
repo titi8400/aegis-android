@@ -2,7 +2,7 @@
 
 ## Périmètre actuel
 
-AEGIS est un prototype en construction. Ne l'utilisez pas pour protéger des communications sensibles. La présence d'Android Keystore, d'un PIN et de BiometricPrompt ne signifie pas que l'application complète est sécurisée.
+AEGIS est un prototype en construction. L’appairage mutuel QR hors ligne est implémenté, mais aucun transport de messages P2P n’est encore disponible. Ne l'utilisez pas pour protéger des communications sensibles. La présence d'Android Keystore, d'un PIN et de BiometricPrompt ne signifie pas que l'application complète est sécurisée.
 
 ## Comportement du prototype
 
@@ -26,7 +26,7 @@ Ne publiez pas de vulnérabilité exploitable dans une issue publique. Contactez
 - Les invitations QR sont signées ECDSA et limitées à cinq minutes ; seules les clés P-256 sont acceptées.
 - Les primitives de défi-réponse signées démontrent la possession des clés, mais ne suffisent pas sans comparaison indépendante des deux empreintes.
 - Les invitations déjà consommées sont inscrites dans un registre chiffré local ; une suppression des données ou un retour à un état antérieur du système peut contourner cet historique.
-- Les appareils approuvés sont prévus pour être conservés dans un répertoire chiffré local ; l’interface n’enregistre pas encore de pair.
+- L’assistant QR peut enregistrer un appareil dans le répertoire chiffré local uniquement après preuve mutuelle et confirmation manuelle de la comparaison des deux empreintes. Cette confirmation reste une déclaration utilisateur, pas une vérification automatique.
 - Les clés publiques échangées doivent être authentifiées lors de l'appairage.
 - Les états d'échec et les limites P2P doivent être visibles à l'utilisateur.
 - Les sauvegardes Android doivent rester désactivées tant qu'une stratégie de sauvegarde chiffrée n'a pas été conçue et testée.
