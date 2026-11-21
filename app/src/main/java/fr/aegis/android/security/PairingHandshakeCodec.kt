@@ -55,22 +55,23 @@ object PairingHandshakeCodec {
     fun createChallenge(
         invite: PairingInviteCodec.VerifiedInvite,
         challengerIdentity: SigningIdentity,
-        challengerDeviceId: String = UUID.randomUUID().toString(),
+        challengerDeviceId: String? = null,
         nowEpochMs: Long = System.currentTimeMillis()
     ): String {
         require(challengerIdentity.exists()) { "Identité locale absente" }
         require(nowEpochMs <= invite.expiresAtEpochMs) { "Invitation expirée" }
-        require(isCanonicalUuid(challengerDeviceId)) { "Identifiant local invalide" }
+        val stableChallengerId = challengerDeviceId ?: PairingInviteCodec.deviceIdForPublicKey(challengerIdentity.publicKeyEncoded())
+        require(isCanonicalUuid(stableChallengerId)) { "Identifiant local invalide" }
         val nonce = randomNonce()
         val publicKey = challengerIdentity.publicKeyEncoded()
         validateP256(publicKey)
         val unsigned = challengeCanonical(
-            invite.deviceId, invite.nonce, challengerDeviceId, nowEpochMs, nonce, publicKey
+            invite.deviceId, invite.nonce, stableChallengerId, nowEpochMs, nonce, publicKey
         )
         val signature = challengerIdentity.sign(unsigned)
         return listOf(
             PREFIX_CHALLENGE, VERSION, invite.deviceId, encode(invite.nonce),
-            challengerDeviceId, nowEpochMs.toString(), encode(nonce),
+            stableChallengerId, nowEpochMs.toString(), encode(nonce),
             encode(publicKey), encode(signature)
         ).joinToString("|")
     }
