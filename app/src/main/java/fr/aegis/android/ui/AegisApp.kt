@@ -15,17 +15,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.aegis.android.security.AndroidKeyStoreIdentity
 
 private val Background = Color(0xFF080C12)
 private val Panel = Color(0xFF101A27)
@@ -35,6 +41,12 @@ private val Green = Color(0xFF39D98A)
 
 @Composable
 fun AegisApp() {
+    val identity = remember { AndroidKeyStoreIdentity() }
+    var identityStatus by remember {
+        mutableStateOf(if (identity.exists()) "CRÉÉE" else "NON CRÉÉE")
+    }
+    var identityError by remember { mutableStateOf<String?>(null) }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Background
@@ -57,22 +69,15 @@ fun AegisApp() {
                     fontWeight = FontWeight.Black,
                     letterSpacing = 4.sp
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .height(8.dp)
-                            .background(Green, RoundedCornerShape(50))
-                    )
-                    Text(
-                        text = "  MODE LOCAL",
-                        color = Green,
-                        fontSize = 10.sp,
-                        letterSpacing = 1.5.sp
-                    )
-                }
+                Text(
+                    text = "●  MODE LOCAL",
+                    color = Green,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.5.sp
+                )
             }
 
-            Spacer(Modifier.height(72.dp))
+            Spacer(Modifier.height(54.dp))
 
             Box(
                 modifier = Modifier
@@ -103,7 +108,7 @@ fun AegisApp() {
                 fontSize = 13.sp
             )
 
-            Spacer(Modifier.height(42.dp))
+            Spacer(Modifier.height(34.dp))
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -128,9 +133,43 @@ fun AegisApp() {
                     }
                     Spacer(Modifier.height(16.dp))
                     StatusLine("Application Android native", "INITIALISÉ")
-                    StatusLine("Stockage de sauvegarde automatique", "DÉSACTIVÉ")
+                    StatusLine("Sauvegarde automatique", "DÉSACTIVÉ")
                     StatusLine("Communication P2P", "À IMPLÉMENTER")
-                    StatusLine("Identité cryptographique", "EN PRÉPARATION")
+                    StatusLine("Identité cryptographique", identityStatus)
+
+                    Spacer(Modifier.height(18.dp))
+                    Button(
+                        onClick = {
+                            identityError = null
+                            try {
+                                identity.createIfAbsent()
+                                identityStatus = "CRÉÉE"
+                            } catch (_: Exception) {
+                                identityStatus = "ÉCHEC"
+                                identityError = "Impossible de créer l'identité sur cet appareil."
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Cyan,
+                            contentColor = Color(0xFF00131D)
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = if (identityStatus == "CRÉÉE") {
+                                "IDENTITÉ LOCALE CRÉÉE"
+                            } else {
+                                "INITIALISER MON IDENTITÉ"
+                            },
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                    identityError?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = Color(0xFFFF7070), fontSize = 11.sp)
+                    }
                 }
             }
 
@@ -163,7 +202,11 @@ private fun StatusLine(label: String, status: String) {
         Text(label, color = Muted, fontSize = 11.sp)
         Text(
             text = status,
-            color = if (status == "DÉSACTIVÉ") Green else Cyan,
+            color = when (status) {
+                "DÉSACTIVÉ", "CRÉÉE" -> Green
+                "ÉCHEC" -> Color(0xFFFF7070)
+                else -> Cyan
+            },
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.5.sp
