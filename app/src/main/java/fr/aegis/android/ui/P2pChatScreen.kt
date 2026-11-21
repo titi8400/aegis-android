@@ -438,6 +438,7 @@ fun P2pChatScreen(
             error = failure.message ?: "Découverte locale indisponible."
         }
         onDispose {
+            recordingStopFlag?.set(false)
             discovery.close()
             transport.close()
             session?.close()
