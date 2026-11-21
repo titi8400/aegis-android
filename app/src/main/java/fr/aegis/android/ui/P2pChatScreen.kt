@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +44,7 @@ import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.nio.charset.StandardCharsets
 import kotlin.concurrent.thread
+import kotlinx.coroutines.delay
 import java.util.UUID
 
 private data class ChatLine(val outgoing: Boolean, val body: String, val ephemeral: Boolean = false)
@@ -106,6 +108,21 @@ fun P2pChatScreen(
                         error = failure.message
                     }
                 }
+            }
+        }
+    }
+
+    LaunchedEffect(activePeerId) {
+        val peerId = activePeerId
+        if (peerId != null) {
+            while (true) {
+                delay(5_000)
+                runCatching { conversationStore.list(peerId) }
+                    .onSuccess { saved ->
+                        history.clear()
+                        saved.forEach { history.add(ChatLine(it.outgoing, it.body, it.expiresAtEpochMs != null)) }
+                    }
+                    .onFailure { error = it.message ?: "Impossible de nettoyer l’historique." }
             }
         }
     }
