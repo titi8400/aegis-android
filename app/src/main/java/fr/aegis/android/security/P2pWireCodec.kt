@@ -36,7 +36,7 @@ object P2pWireCodec {
             .toByteArray(Charsets.UTF_8)
     }
 
-    fun decodeText(frame: ByteArray, nowEpochMs: Long = System.currentTimeMillis()): TextMessage {
+    fun decodeText(frame: ByteArray, nowEpochMs: Long = System.currentTimeMillis()): TextMessage? {
         require(frame.isNotEmpty() && frame.size <= MAX_FRAME_BYTES) { "Trame AEGIS invalide." }
         val json = JSONObject(frame.toString(Charsets.UTF_8))
         require(json.getString("magic") == MAGIC && json.getInt("version") == VERSION) {
@@ -50,8 +50,8 @@ object P2pWireCodec {
         val expiresAt = if (json.isNull("expiresAt")) null else json.getLong("expiresAt")
         require(expiresAt == null || expiresAt > createdAt) { "Expiration de message invalide." }
         if (expiresAt != null) {
-            require(expiresAt > nowEpochMs) { "Ce message éphémère a expiré." }
             require(expiresAt - createdAt <= MAX_TTL_MS) { "Durée de conservation excessive." }
+            if (expiresAt <= nowEpochMs) return null
         }
         val body = json.getString("body")
         validateBody(body)
