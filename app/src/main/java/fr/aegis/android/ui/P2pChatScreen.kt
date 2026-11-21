@@ -94,6 +94,7 @@ fun P2pChatScreen(
     val transport = remember { P2pLanTransport(identity, peerStore) }
     val discovery = remember { P2pLanDiscovery(identity, peerStore) }
     val discoveredPeers = remember { mutableStateListOf<P2pLanDiscovery.DiscoveredPeer>() }
+    val trustedPeers = remember { mutableStateListOf<TrustedPeerStore.Peer>() }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     val history = remember { mutableStateListOf<ChatLine>() }
     var host by remember { mutableStateOf("") }
@@ -102,6 +103,7 @@ fun P2pChatScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var session by remember { mutableStateOf<P2pLanTransport.SecureSession?>(null) }
     var activePeerId by remember { mutableStateOf<String?>(null) }
+    var activePeerName by remember { mutableStateOf<String?>(null) }
     val pendingAcks = remember { ConcurrentHashMap<String, CompletableFuture<Unit>>() }
     var pendingOutboxCount by remember { mutableStateOf(0) }
     var listening by remember { mutableStateOf(false) }
@@ -119,6 +121,15 @@ fun P2pChatScreen(
                 ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         )
     }
+    LaunchedEffect(Unit) {
+        runCatching { peerStore.listPeers() }
+            .onSuccess { peers ->
+                trustedPeers.clear()
+                trustedPeers.addAll(peers)
+            }
+            .onFailure { error = it.message ?: "Impossible de lire les appareils de confiance." }
+    }
+
     fun startVoiceRecording() {
         val current = session
         if (current == null) {
@@ -388,6 +399,9 @@ fun P2pChatScreen(
         callEngine?.close()
         callEngine = createCallEngine(connected)
         activePeerId = connected.remoteDeviceId
+        activePeerName = runCatching {
+            peerStore.listPeers().firstOrNull { it.deviceId == connected.remoteDeviceId }?.displayName
+        }.getOrNull() ?: label
         receivedFiles.clear()
         runCatching { receivedFileStore.list() }.onSuccess { receivedFiles.addAll(it) }
         history.clear()
@@ -586,6 +600,38 @@ fun P2pChatScreen(
                 ) { Text("${peer.displayName} • ${peer.address} • PORT ${peer.port}") }
             }
         }
+        Text("DESTINATAIRES DE CONFIANCE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        if (trustedPeers.isEmpty()) {
+            Text("Aucun appareil appairé.", color = Color(0xFF8292A3), fontSize = 10.sp)
+        } else {
+            trustedPeers.forEach { peer ->
+                Button(
+                    onClick = {
+                        activePeerId = peer.deviceId
+                        activePeerName = peer.displayName
+                        history.clear()
+                        runCatching { conversationStore.list(peer.deviceId) }
+                            .onSuccess { saved ->
+                                saved.forEach { history.add(ChatLine(it.outgoing, it.body, it.expiresAtEpochMs != null)) }
+                            }
+                            .onFailure { error = it.message ?: "Historique du correspondant illisible." }
+                        pendingOutboxCount = runCatching { outboxStore.list(peer.deviceId).size }.getOrDefault(0)
+                        status = if (session?.remoteDeviceId == peer.deviceId) {
+                            "Liaison active avec ${peer.displayName}."
+                        } else {
+                            "Destinataire ${peer.displayName} sélectionné — messages conservés jusqu'à sa reconnexion."
+                        }
+                    },
+                    enabled = session == null || session?.remoteDeviceId == peer.deviceId,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (activePeerId == peer.deviceId) Color(0xFF16405A) else Color(0xFF10233B),
+                        contentColor = Color(0xFF00BFFF)
+                    )
+                ) { Text("${peer.displayName} • ${peer.fingerprintSha256.take(12)}") }
+            }
+        }
+        activePeerName?.let { Text("DESTINATAIRE ACTUEL : $it", color = Color(0xFF39D98A), fontSize = 10.sp) }
 
         Button(
             onClick = {
