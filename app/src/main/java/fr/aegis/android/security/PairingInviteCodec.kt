@@ -106,11 +106,13 @@ object PairingInviteCodec {
         require(key is ECPublicKey) { "La clé d’identité doit être une clé EC" }
         require(key.params.curve.field.fieldSize == 256 && key.params.order.bitLength() == 256) { "La clé d’identité doit utiliser la courbe NIST P-256" }
         require(signature.size in 8..MAX_SIGNATURE_BYTES) { "Signature invalide" }
-        val valid = Signature.getInstance("SHA256withECDSA").run {
-            initVerify(key)
-            update(unsigned)
-            verify(signature)
-        }
+        val valid = runCatching {
+            Signature.getInstance("SHA256withECDSA").run {
+                initVerify(key)
+                update(unsigned)
+                verify(signature)
+            }
+        }.getOrDefault(false)
         require(valid) { "Signature de l'invitation invalide" }
 
         return VerifiedInvite(
