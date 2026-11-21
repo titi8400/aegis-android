@@ -65,6 +65,7 @@ object PairingHandshakeCodec {
         val nonce = randomNonce()
         val publicKey = challengerIdentity.publicKeyEncoded()
         validateP256(publicKey)
+        require(challengerId == PairingInviteCodec.deviceIdForPublicKey(publicKey)) { "Identifiant du pair non lié à sa clé publique" }
         val unsigned = challengeCanonical(
             invite.deviceId, invite.nonce, stableChallengerId, nowEpochMs, nonce, publicKey
         )
