@@ -53,7 +53,7 @@ object PairingHandshakeCodec {
 
     fun createChallenge(
         invite: PairingInviteCodec.VerifiedInvite,
-        challengerIdentity: AndroidKeyStoreIdentity,
+        challengerIdentity: SigningIdentity,
         challengerDeviceId: String = UUID.randomUUID().toString(),
         nowEpochMs: Long = System.currentTimeMillis()
     ): String {
@@ -115,13 +115,13 @@ object PairingHandshakeCodec {
     fun createResponse(
         challenge: VerifiedChallenge,
         responderInvite: PairingInviteCodec.VerifiedInvite,
-        responderIdentity: AndroidKeyStoreIdentity
+        responderIdentity: SigningIdentity
     ): String = createResponsePackage(challenge, responderInvite, responderIdentity).encoded
 
     fun createResponsePackage(
         challenge: VerifiedChallenge,
         responderInvite: PairingInviteCodec.VerifiedInvite,
-        responderIdentity: AndroidKeyStoreIdentity
+        responderIdentity: SigningIdentity
     ): ResponsePackage {
         require(challenge.inviteDeviceId == responderInvite.deviceId) { "Défi destiné à une autre identité" }
         require(System.currentTimeMillis() <= challenge.createdAtEpochMs + VALIDITY_MS) { "Défi expiré" }
