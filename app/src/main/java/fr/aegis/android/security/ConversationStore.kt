@@ -20,7 +20,8 @@ class ConversationStore(context: Context) {
         val peerDeviceId: String,
         val body: String,
         val outgoing: Boolean,
-        val createdAtEpochMs: Long
+        val createdAtEpochMs: Long,
+        val expiresAtEpochMs: Long?
     )
 
     @Synchronized
@@ -28,19 +29,25 @@ class ConversationStore(context: Context) {
         peerDeviceId: String,
         body: String,
         outgoing: Boolean,
-        nowEpochMs: Long = System.currentTimeMillis()
+        nowEpochMs: Long = System.currentTimeMillis(),
+        expiresAtEpochMs: Long? = null,
+        messageId: String = UUID.randomUUID().toString()
     ): Message {
         validatePeerId(peerDeviceId)
         require(body.isNotBlank() && body.length <= MAX_MESSAGE_CHARS) {
             "Message vide ou trop long."
         }
-        val messages = read(peerDeviceId).toMutableList()
+        require(expiresAtEpochMs == null || expiresAtEpochMs > nowEpochMs) {
+            "Expiration de message invalide."
+        }
+        val messages = read(peerDeviceId).filter { it.expiresAtEpochMs == null || it.expiresAtEpochMs > nowEpochMs }.toMutableList()
         val message = Message(
-            id = UUID.randomUUID().toString(),
+            id = messageId,
             peerDeviceId = peerDeviceId,
             body = body,
             outgoing = outgoing,
-            createdAtEpochMs = nowEpochMs
+            createdAtEpochMs = nowEpochMs,
+            expiresAtEpochMs = expiresAtEpochMs
         )
         messages.add(message)
         write(peerDeviceId, messages.takeLast(MAX_MESSAGES))
@@ -50,7 +57,10 @@ class ConversationStore(context: Context) {
     @Synchronized
     fun list(peerDeviceId: String): List<Message> {
         validatePeerId(peerDeviceId)
-        return read(peerDeviceId)
+        val all = read(peerDeviceId)
+        val active = all.filter { it.expiresAtEpochMs == null || it.expiresAtEpochMs > System.currentTimeMillis() }
+        if (active.size != all.size) write(peerDeviceId, active)
+        return active
     }
 
     @Synchronized
@@ -76,7 +86,8 @@ class ConversationStore(context: Context) {
                         peerDeviceId = peerDeviceId,
                         body = body,
                         outgoing = item.getBoolean("outgoing"),
-                        createdAtEpochMs = item.getLong("createdAt")
+                        createdAtEpochMs = item.getLong("createdAt"),
+                        expiresAtEpochMs = if (item.isNull("expiresAt")) null else item.getLong("expiresAt")
                     )
                     require(runCatching { UUID.fromString(message.id) }.isSuccess) {
                         "Identifiant de message invalide."
@@ -100,6 +111,7 @@ class ConversationStore(context: Context) {
                     .put("body", message.body)
                     .put("outgoing", message.outgoing)
                     .put("createdAt", message.createdAtEpochMs)
+                    .put("expiresAt", message.expiresAtEpochMs ?: JSONObject.NULL)
             )
         }
         val bytes = array.toString().toByteArray(Charsets.UTF_8)
