@@ -109,6 +109,13 @@ class P2pLanTransport(
     class SecureSession internal constructor(
         private val socket: SSLSocket
     ) : Closeable {
+        /** Stable identity derived from the TLS peer certificate already pinned by the trust manager. */
+        val remoteDeviceId: String = run {
+            val certificate = socket.session.peerCertificates.firstOrNull() as? java.security.cert.X509Certificate
+                ?: error("Certificat d'identité du pair absent.")
+            PairingInviteCodec.deviceIdForPublicKey(certificate.publicKey.encoded)
+        }
+
         private val input = DataInputStream(BufferedInputStream(socket.inputStream))
         private val output = DataOutputStream(BufferedOutputStream(socket.outputStream))
         private val writeLock = Any()
