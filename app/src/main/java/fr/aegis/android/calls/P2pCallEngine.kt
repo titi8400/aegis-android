@@ -153,9 +153,6 @@ class P2pCallEngine(
         }
     }
 
-    val hasPendingIncomingOffer: Boolean
-        get() = pendingOffer != null
-
     fun acceptPendingOffer() {
         val offer = pendingOffer ?: throw IllegalStateException("Aucun appel entrant en attente.")
         check(hasPermission(Manifest.permission.RECORD_AUDIO)) {
