@@ -60,6 +60,9 @@ internal object PinnedMutualTls {
         val protocols = listOf("TLSv1.3", "TLSv1.2").filter { it in supported }
         require(protocols.isNotEmpty()) { "Aucune version TLS moderne disponible." }
         socket.enabledProtocols = protocols.toTypedArray()
+        val suites = socket.supportedCipherSuites.filter { it in ALLOWED_CIPHER_SUITES }
+        require(suites.isNotEmpty()) { "Aucune suite TLS AEAD compatible disponible." }
+        socket.enabledCipherSuites = suites.toTypedArray()
         socket.useClientMode = true
     }
 
@@ -68,6 +71,9 @@ internal object PinnedMutualTls {
         val protocols = listOf("TLSv1.3", "TLSv1.2").filter { it in supported }
         require(protocols.isNotEmpty()) { "Aucune version TLS moderne disponible." }
         socket.enabledProtocols = protocols.toTypedArray()
+        val suites = socket.supportedCipherSuites.filter { it in ALLOWED_CIPHER_SUITES }
+        require(suites.isNotEmpty()) { "Aucune suite TLS AEAD compatible disponible." }
+        socket.enabledCipherSuites = suites.toTypedArray()
         socket.needClientAuth = true
     }
 
@@ -101,6 +107,13 @@ internal object PinnedMutualTls {
             .getCertificate(builder.build(signer))
             .also {
                 it.checkValidity(Date(now))
+                require(it.sigAlgName.equals("SHA256withECDSA", ignoreCase = true)) {
+                    "Algorithme de signature du certificat inattendu."
+                }
+                require(it.extendedKeyUsage.orEmpty().containsAll(listOf(
+                    KeyPurposeId.id_kp_serverAuth.id,
+                    KeyPurposeId.id_kp_clientAuth.id
+                ))) { "Usages TLS du certificat invalides." }
                 it.verify(it.publicKey)
                 require(it.publicKey.encoded.contentEquals(identity.publicKeyEncoded())) {
                     "Le certificat TLS ne correspond pas à l'identité AEGIS."
@@ -199,5 +212,12 @@ internal object PinnedMutualTls {
         }
     }
 
+    private val ALLOWED_CIPHER_SUITES = setOf(
+        "TLS_AES_128_GCM_SHA256",
+        "TLS_AES_256_GCM_SHA384",
+        "TLS_CHACHA20_POLY1305_SHA256",
+        "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+        "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+    )
     private const val CERTIFICATE_LIFETIME_MS = 24L * 60L * 60L * 1000L
 }
