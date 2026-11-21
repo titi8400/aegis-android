@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,10 +47,9 @@ fun P2pChatScreen(
     identity: AndroidKeyStoreIdentity,
     onClose: () -> Unit
 ) {
+    val context = LocalContext.current
     val transport = remember {
-        P2pLanTransport(identity, TrustedPeerStore(
-            androidx.compose.ui.platform.LocalContext.current.applicationContext
-        ))
+        P2pLanTransport(identity, TrustedPeerStore(context.applicationContext))
     }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     val history = remember { mutableStateListOf<ChatLine>() }
