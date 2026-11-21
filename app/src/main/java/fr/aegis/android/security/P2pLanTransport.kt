@@ -56,10 +56,16 @@ class P2pLanTransport(
                 ) as SSLServerSocket
                 PinnedMutualTls.configureServer(server)
                 serverSocket = server
+                if (closed.get()) {
+                    server.close()
+                    return@execute
+                }
                 while (!closed.get() && !server.isClosed) {
                     val raw = server.accept() as SSLSocket
                     workers.execute {
                         try {
+                            raw.tcpNoDelay = true
+                            raw.keepAlive = true
                             raw.soTimeout = HANDSHAKE_TIMEOUT_MS
                             raw.startHandshake()
                             raw.soTimeout = 0
@@ -89,6 +95,8 @@ class P2pLanTransport(
         val socket = context.socketFactory.createSocket() as SSLSocket
         try {
             socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
+            socket.tcpNoDelay = true
+            socket.keepAlive = true
             socket.soTimeout = HANDSHAKE_TIMEOUT_MS
             PinnedMutualTls.configure(socket)
             socket.startHandshake()
