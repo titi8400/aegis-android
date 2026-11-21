@@ -90,15 +90,17 @@ fun P2pChatScreen(
                     val frame = connected.readFrame()
                     val decoded = P2pWireCodec.decodeText(frame)
                     frame.fill(0)
-                    conversationStore.append(
-                        connected.remoteDeviceId,
-                        decoded.body,
-                        outgoing = false,
-                        expiresAtEpochMs = decoded.expiresAtEpochMs,
-                        messageId = decoded.id,
-                        createdAtEpochMs = decoded.createdAtEpochMs
-                    )
-                    mainHandler.post { history.add(ChatLine(false, decoded.body, decoded.expiresAtEpochMs != null)) }
+                    if (decoded != null) {
+                        conversationStore.append(
+                            connected.remoteDeviceId,
+                            decoded.body,
+                            outgoing = false,
+                            expiresAtEpochMs = decoded.expiresAtEpochMs,
+                            messageId = decoded.id,
+                            createdAtEpochMs = decoded.createdAtEpochMs
+                        )
+                        mainHandler.post { history.add(ChatLine(false, decoded.body, decoded.expiresAtEpochMs != null)) }
+                    }
                 }
             } catch (failure: Exception) {
                 mainHandler.post {
