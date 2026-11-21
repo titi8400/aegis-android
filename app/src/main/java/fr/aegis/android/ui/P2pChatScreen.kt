@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,13 +37,15 @@ import fr.aegis.android.security.AndroidKeyStoreIdentity
 import fr.aegis.android.security.ConversationStore
 import fr.aegis.android.security.P2pLanDiscovery
 import fr.aegis.android.security.P2pLanTransport
+import fr.aegis.android.security.P2pWireCodec
 import fr.aegis.android.security.TrustedPeerStore
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.nio.charset.StandardCharsets
 import kotlin.concurrent.thread
+import java.util.UUID
 
-private data class ChatLine(val outgoing: Boolean, val body: String)
+private data class ChatLine(val outgoing: Boolean, val body: String, val ephemeral: Boolean = false)
 
 @Composable
 fun P2pChatScreen(
@@ -64,6 +67,7 @@ fun P2pChatScreen(
     var session by remember { mutableStateOf<P2pLanTransport.SecureSession?>(null) }
     var activePeerId by remember { mutableStateOf<String?>(null) }
     var listening by remember { mutableStateOf(false) }
+    var ephemeralMinutes by remember { mutableStateOf(0) }
 
     fun attachSession(connected: P2pLanTransport.SecureSession, label: String) {
         session?.close()
@@ -72,7 +76,7 @@ fun P2pChatScreen(
         history.clear()
         try {
             conversationStore.list(connected.remoteDeviceId).forEach { saved ->
-                history.add(ChatLine(saved.outgoing, saved.body))
+                history.add(ChatLine(saved.outgoing, saved.body, saved.expiresAtEpochMs != null))
             }
         } catch (failure: Exception) {
             error = failure.message ?: "Impossible de lire l’historique chiffré."
@@ -82,10 +86,17 @@ fun P2pChatScreen(
             try {
                 while (connected.isOpen) {
                     val frame = connected.readFrame()
-                    val text = frame.toString(StandardCharsets.UTF_8)
+                    val decoded = P2pWireCodec.decodeText(frame)
                     frame.fill(0)
-                    conversationStore.append(connected.remoteDeviceId, text, outgoing = false)
-                    mainHandler.post { history.add(ChatLine(false, text)) }
+                    conversationStore.append(
+                        connected.remoteDeviceId,
+                        decoded.body,
+                        outgoing = false,
+                        expiresAtEpochMs = decoded.expiresAtEpochMs,
+                        messageId = decoded.id,
+                        createdAtEpochMs = decoded.createdAtEpochMs
+                    )
+                    mainHandler.post { history.add(ChatLine(false, decoded.body, decoded.expiresAtEpochMs != null)) }
                 }
             } catch (failure: Exception) {
                 mainHandler.post {
@@ -207,13 +218,19 @@ fun P2pChatScreen(
         ) {
             items(history) { line ->
                 Text(
-                    text = (if (line.outgoing) "MOI  •  " else "PAIR  •  ") + line.body,
+                    text = (if (line.outgoing) "MOI  •  " else "PAIR  •  ") + line.body + if (line.ephemeral) "  •  ÉPHÉMÈRE" else "",
                     color = if (line.outgoing) Color(0xFF00BFFF) else Color.White,
                     fontSize = 12.sp
                 )
             }
         }
 
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            FilterChip(selected = ephemeralMinutes == 0, onClick = { ephemeralMinutes = 0 }, label = { Text("DURABLE") })
+            FilterChip(selected = ephemeralMinutes == 1, onClick = { ephemeralMinutes = 1 }, label = { Text("1 MIN") })
+            FilterChip(selected = ephemeralMinutes == 60, onClick = { ephemeralMinutes = 60 }, label = { Text("1 H") })
+            FilterChip(selected = ephemeralMinutes == 1440, onClick = { ephemeralMinutes = 1440 }, label = { Text("24 H") })
+        }
         OutlinedTextField(
             value = message,
             onValueChange = { message = it.take(4096) },
@@ -227,10 +244,23 @@ fun P2pChatScreen(
                 val body = message.trim()
                 if (body.isNotEmpty()) {
                     try {
-                        current.sendFrame(body.toByteArray(StandardCharsets.UTF_8))
                         val peerId = activePeerId ?: error("Identité du pair non disponible.")
-                        conversationStore.append(peerId, body, outgoing = true)
-                        history.add(ChatLine(true, body))
+                        val createdAt = System.currentTimeMillis()
+                        val expiresAt = if (ephemeralMinutes == 0) null else createdAt + ephemeralMinutes * 60_000L
+                        val messageId = UUID.randomUUID().toString()
+                        val frame = P2pWireCodec.encodeText(body, createdAt, expiresAt, messageId)
+                        current.sendFrame(frame)
+                        frame.fill(0)
+                        conversationStore.append(
+                            peerId,
+                            body,
+                            outgoing = true,
+                            nowEpochMs = createdAt,
+                            expiresAtEpochMs = expiresAt,
+                            messageId = messageId,
+                            createdAtEpochMs = createdAt
+                        )
+                        history.add(ChatLine(true, body, expiresAt != null))
                         message = ""
                         error = null
                     } catch (failure: Exception) {
