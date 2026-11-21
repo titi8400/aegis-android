@@ -50,6 +50,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import fr.aegis.android.security.AndroidKeyStoreIdentity
 import fr.aegis.android.security.PinLockManager
+import fr.aegis.android.security.PairingInviteCodec
 import kotlinx.coroutines.delay
 
 private val Background = Color(0xFF080C12)
@@ -78,6 +79,9 @@ fun AegisApp() {
         mutableStateOf(if (identity.exists()) "CRÉÉE" else "NON CRÉÉE")
     }
     var identityError by remember { mutableStateOf<String?>(null) }
+    var scannerOpen by remember { mutableStateOf(false) }
+    var scannedFingerprint by remember { mutableStateOf<String?>(null) }
+    var pairingError by remember { mutableStateOf<String?>(null) }
     var lastInteraction by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
 
     DisposableEffect(lifecycleOwner, pinConfigured) {
@@ -321,6 +325,21 @@ fun AegisApp() {
                     Spacer(Modifier.height(14.dp))
                     Text(it, color = Danger, fontSize = 11.sp)
                 }
+            } else if (scannerOpen) {
+                PairingQrScanner(
+                    onInviteScanned = { payload ->
+                        try {
+                            val verified = PairingInviteCodec.verify(payload)
+                            scannedFingerprint = verified.fingerprintSha256
+                            pairingError = null
+                        } catch (error: Exception) {
+                            scannedFingerprint = null
+                            pairingError = error.message ?: "Invitation invalide."
+                        }
+                        scannerOpen = false
+                    },
+                    onClose = { scannerOpen = false }
+                )
             } else {
                 Text(
                     text = "COMMUNICATION PRIVÉE",
@@ -391,6 +410,27 @@ fun AegisApp() {
                             Spacer(Modifier.height(8.dp))
                             Text(it, color = Danger, fontSize = 11.sp)
                         }
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                scannerOpen = true
+                                scannedFingerprint = null
+                                pairingError = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Panel, contentColor = Cyan),
+                            shape = RoundedCornerShape(10.dp)
+                        ) { Text("SCANNER UN QR D’APPAREIL") }
+                        scannedFingerprint?.let {
+                            Spacer(Modifier.height(12.dp))
+                            Text("INVITATION SIGNÉE VÉRIFIÉE", color = Green, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Empreinte SHA-256 : $it", color = Color.White, fontSize = 10.sp)
+                            Text("Compare cette empreinte par un canal indépendant. L’appareil n’est pas encore approuvé.", color = Muted, fontSize = 10.sp)
+                        }
+                        pairingError?.let {
+                            Spacer(Modifier.height(8.dp))
+                            Text("QR REFUSÉ : $it", color = Danger, fontSize = 11.sp)
+                        }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -412,14 +452,14 @@ fun AegisApp() {
 
             Spacer(Modifier.height(28.dp))
             Text(
-                text = "VERSION 0.2.0 • PROTOTYPE",
+                text = "VERSION 0.5.0 • PROTOTYPE",
                 color = Muted,
                 fontSize = 10.sp,
                 letterSpacing = 1.5.sp
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Les communications P2P ne sont pas encore actives.",
+                text = "Le scan vérifie une invitation, sans encore approuver l’appareil.",
                 color = Muted,
                 fontSize = 10.sp
             )
