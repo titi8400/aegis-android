@@ -126,7 +126,7 @@ object PairingInviteCodec {
     fun deviceIdForPublicKey(publicKeyEncoded: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(publicKeyEncoded)
         val buffer = ByteBuffer.wrap(digest)
-        val most = (buffer.long and 0xffffffffffff0fffUL.toLong()) or 0x0000000000008000L
+        val most = (buffer.long and -0xF001L) or 0x0000000000008000L
         val least = (buffer.long and 0x3fffffffffffffffL) or Long.MIN_VALUE
         digest.fill(0)
         return UUID(most, least).toString()
