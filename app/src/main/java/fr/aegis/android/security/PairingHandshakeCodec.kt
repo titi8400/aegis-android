@@ -42,6 +42,7 @@ object PairingHandshakeCodec {
         val challengerDeviceId: String,
         val challengerPublicKey: ByteArray,
         val responderPublicKey: ByteArray,
+        val responderNonce: ByteArray,
         val responderFingerprint: String,
         val transcriptSha256: String
     )
@@ -147,6 +148,7 @@ object PairingHandshakeCodec {
             challengerDeviceId = challenge.challengerDeviceId,
             challengerPublicKey = challenge.challengerPublicKey,
             responderPublicKey = publicKey,
+            responderNonce = responderNonce,
             responderFingerprint = PairingInviteCodec.fingerprint(publicKey),
             transcriptSha256 = MessageDigest.getInstance("SHA-256").digest(transcript).toHex()
         )
@@ -172,7 +174,7 @@ object PairingHandshakeCodec {
         val challengeNonce = decode(f[5], NONCE_BYTES)
         require(MessageDigest.isEqual(inviteNonce, challenge.inviteNonce)) { "Nonce d’invitation incorrect" }
         require(MessageDigest.isEqual(challengeNonce, challenge.challengeNonce)) { "Défi incorrect ou rejoué" }
-        decode(f[6], NONCE_BYTES) // responder nonce is signed as part of the transcript
+        val responderNonce = decode(f[6], NONCE_BYTES)
         val responderKey = decode(f[7], MAX_KEY_BYTES)
         val signature = decode(f[8], MAX_SIGNATURE_BYTES)
         require(MessageDigest.isEqual(responderKey, expectedResponder.publicKeyEncoded)) {
@@ -189,6 +191,7 @@ object PairingHandshakeCodec {
             challengerDeviceId = challenge.challengerDeviceId,
             challengerPublicKey = challenge.challengerPublicKey,
             responderPublicKey = responderKey,
+            responderNonce = responderNonce,
             responderFingerprint = PairingInviteCodec.fingerprint(responderKey),
             transcriptSha256 = MessageDigest.getInstance("SHA-256").digest(transcript).toHex()
         )
