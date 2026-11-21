@@ -1,11 +1,9 @@
 package fr.aegis.android.security
 
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.util.UUID
 
 /** Binary, bounded file-transfer packets carried inside the authenticated TLS session. */
@@ -124,9 +122,9 @@ object P2pFileTransferCodec {
         return leaf.ifBlank { "fichier-aegis" }
     }
 
-    private fun header(type: Byte, transferId: String, payloadLength: Int): ByteBuffer {
+    private fun header(type: Int, transferId: String, payloadLength: Int): ByteBuffer {
         validateUuid(transferId)
-        require(payloadLength in 0..MAX_PACKET_BYTES) { "Trame trop volumineuse." }
+        require(payloadLength in 0..(MAX_PACKET_BYTES - HEADER_BYTES - UUID_BYTES)) { "Trame trop volumineuse." }
         val id = UUID.fromString(transferId)
         return ByteBuffer.allocate(HEADER_BYTES + UUID_BYTES + payloadLength)
             .order(ByteOrder.BIG_ENDIAN)
