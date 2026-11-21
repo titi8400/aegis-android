@@ -71,6 +71,7 @@ dependencies {
     implementation("androidx.camera:camera-view:1.4.2")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
+    implementation("io.github.webrtc-sdk:android:150.7871.08")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
