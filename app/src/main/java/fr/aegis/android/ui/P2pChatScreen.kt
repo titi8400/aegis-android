@@ -389,14 +389,24 @@ fun P2pChatScreen(
         if (receivedFiles.isNotEmpty()) {
             Text("FICHIERS REÇUS — COFFRE CHIFFRÉ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
             receivedFiles.forEach { file ->
-                Button(
-                    onClick = {
-                        pendingExportId = file.id
-                        exportLauncher.launch(file.fileName)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10233B), contentColor = Color(0xFF00BFFF))
-                ) { Text("EXPORTER • ${file.fileName} • ${file.size / 1024} Kio") }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(
+                        onClick = {
+                            pendingExportId = file.id
+                            exportLauncher.launch(file.fileName)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10233B), contentColor = Color(0xFF00BFFF))
+                    ) { Text("EXPORTER • ${file.fileName} • ${file.size / 1024} Kio") }
+                    Button(
+                        onClick = {
+                            runCatching { receivedFileStore.delete(file.id) }
+                                .onSuccess { receivedFiles.remove(file) }
+                                .onFailure { error = it.message ?: "Suppression impossible." }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF26313E), contentColor = Color(0xFFFF7070))
+                    ) { Text("SUPPRIMER") }
+                }
             }
         }
 
