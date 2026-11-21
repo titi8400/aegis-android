@@ -269,25 +269,42 @@ class P2pCallEngine(
             audioTrack = track
             peerConnection?.addTrack(track, listOf("aegis-stream"))
         }
-        if (videoTrack == null && hasPermission(Manifest.permission.CAMERA)) {
-            val enumerator = Camera2Enumerator(appContext)
-            val cameraName = enumerator.deviceNames.firstOrNull { enumerator.isFrontFacing(it) }
-                ?: enumerator.deviceNames.firstOrNull()
-            if (cameraName != null) {
-                val capturer = enumerator.createCapturer(cameraName, null)
-                if (capturer != null) {
-                    cameraCapturer = capturer
-                    val source = factory.createVideoSource(false)
-                    val textureHelper = SurfaceTextureHelper.create("AegisCamera", egl.eglBaseContext)
-                    videoSource = source
-                    surfaceTextureHelper = textureHelper
-                    capturer.initialize(textureHelper, appContext, source.capturerObserver)
-                    capturer.startCapture(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS)
-                    val track = factory.createVideoTrack("aegis-video", source)
-                    videoTrack = track
-                    localRenderer?.let(track::addSink)
-                    peerConnection?.addTrack(track, listOf("aegis-stream"))
-                }
+        if (videoTrack == null) {
+            if (!hasPermission(Manifest.permission.CAMERA)) {
+                cameraEnabled = false
+                return
+            }
+            var capturer: CameraVideoCapturer? = null
+            var source: VideoSource? = null
+            var textureHelper: SurfaceTextureHelper? = null
+            var captureStarted = false
+            try {
+                val enumerator = Camera2Enumerator(appContext)
+                val cameraName = enumerator.deviceNames.firstOrNull { enumerator.isFrontFacing(it) }
+                    ?: enumerator.deviceNames.firstOrNull()
+                    ?: throw IllegalStateException("Aucune caméra compatible.")
+                capturer = enumerator.createCapturer(cameraName, null)
+                    ?: throw IllegalStateException("Initialisation de la caméra impossible.")
+                source = factory.createVideoSource(false)
+                textureHelper = SurfaceTextureHelper.create("AegisCamera", egl.eglBaseContext)
+                    ?: throw IllegalStateException("Initialisation du flux caméra impossible.")
+                capturer.initialize(textureHelper, appContext, source.capturerObserver)
+                capturer.startCapture(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS)
+                captureStarted = true
+                val track = factory.createVideoTrack("aegis-video", source)
+                cameraCapturer = capturer
+                videoSource = source
+                surfaceTextureHelper = textureHelper
+                videoTrack = track
+                localRenderer?.let(track::addSink)
+                peerConnection?.addTrack(track, listOf("aegis-stream"))
+            } catch (_: Exception) {
+                if (captureStarted) runCatching { capturer?.stopCapture() }
+                runCatching { capturer?.dispose() }
+                runCatching { textureHelper?.dispose() }
+                runCatching { source?.dispose() }
+                cameraEnabled = false
+                onStateChanged("Caméra indisponible : l'appel continue en audio uniquement.")
             }
         }
     }
