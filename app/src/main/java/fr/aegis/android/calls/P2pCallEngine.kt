@@ -46,6 +46,7 @@ class P2pCallEngine(
     private val factory: PeerConnectionFactory
     private var peerConnection: PeerConnection? = null
     private var callId: String? = null
+    private var pendingOffer: P2pCallSignalCodec.Signal.Offer? = null
     private var remoteDescriptionSet = false
     private val pendingCandidates = CopyOnWriteArrayList<IceCandidate>()
     private var audioSource: AudioSource? = null
@@ -114,22 +115,9 @@ class P2pCallEngine(
                     return
                 }
                 callId = signal.callId
+                pendingOffer = signal
                 onIncomingOffer()
-                if (!hasPermission(Manifest.permission.RECORD_AUDIO)) {
-                    fail("Autorise le microphone pour accepter l'appel.")
-                    return
-                }
-                ensurePeerConnection()
-                addLocalMedia()
-                val description = SessionDescription(SessionDescription.Type.OFFER, signal.sdp)
-                peerConnection?.setRemoteDescription(object : SdpObserverAdapter() {
-                    override fun onSetSuccess() {
-                        remoteDescriptionSet = true
-                        flushPendingCandidates()
-                        createAnswer(signal.callId)
-                    }
-                    override fun onSetFailure(error: String?) = fail("Offre distante refusée : $error")
-                }, description)
+                onStateChanged("Appel entrant : accepte ou refuse l'appel.")
             }
             is P2pCallSignalCodec.Signal.Answer -> {
                 if (signal.callId != callId) return
@@ -156,6 +144,34 @@ class P2pCallEngine(
                 }
             }
         }
+    }
+
+    val hasPendingIncomingOffer: Boolean
+        get() = pendingOffer != null
+
+    fun acceptPendingOffer() {
+        val offer = pendingOffer ?: throw IllegalStateException("Aucun appel entrant en attente.")
+        check(hasPermission(Manifest.permission.RECORD_AUDIO)) {
+            "L'autorisation microphone est nécessaire pour accepter l'appel."
+        }
+        pendingOffer = null
+        ensurePeerConnection()
+        addLocalMedia()
+        val description = SessionDescription(SessionDescription.Type.OFFER, offer.sdp)
+        peerConnection?.setRemoteDescription(object : SdpObserverAdapter() {
+            override fun onSetSuccess() {
+                remoteDescriptionSet = true
+                flushPendingCandidates()
+                createAnswer(offer.callId)
+            }
+            override fun onSetFailure(error: String?) = fail("Offre distante refusée : $error")
+        }, description)
+    }
+
+    fun rejectPendingOffer() {
+        pendingOffer?.let { sendSignal(P2pCallSignalCodec.Signal.Hangup(it.callId)) }
+        closePeerConnection()
+        onStateChanged("Appel entrant refusé.")
     }
 
     fun hangUp() {
