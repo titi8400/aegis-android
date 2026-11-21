@@ -35,6 +35,19 @@ class P2pWireCodecTest {
     }
 
     @Test
+    fun deliveryAcknowledgementRoundTrips() {
+        val decoded = P2pWireCodec.decodeAck(P2pWireCodec.encodeAck(id))
+        assertEquals(id, decoded)
+    }
+
+    @Test
+    fun rejectsMalformedDeliveryAcknowledgement() {
+        assertThrows(IllegalArgumentException::class.java) {
+            P2pWireCodec.decodeAck("AEGIS-ACK|1|not-a-uuid".toByteArray(Charsets.US_ASCII))
+        }
+    }
+
+    @Test
     fun rejectsUnsupportedVersion() {
         val encoded = P2pWireCodec.encodeText("test", now, null, id)
             .toString(Charsets.US_ASCII)
