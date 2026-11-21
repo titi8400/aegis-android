@@ -130,7 +130,7 @@ object P2pFileTransferCodec {
             .order(ByteOrder.BIG_ENDIAN)
             .put(MAGIC)
             .put(VERSION)
-            .put(type)
+            .put(type.toByte())
             .putLong(id.mostSignificantBits)
             .putLong(id.leastSignificantBits)
     }
