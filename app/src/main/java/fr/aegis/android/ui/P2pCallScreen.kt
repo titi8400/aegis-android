@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -38,6 +39,7 @@ fun P2pCallScreen(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current.density
     BackHandler(enabled = true, onBack = onClose)
     var started by remember { mutableStateOf(false) }
     var microphoneMuted by remember { mutableStateOf(false) }
@@ -80,8 +82,13 @@ fun P2pCallScreen(
                         FrameLayout.LayoutParams.MATCH_PARENT
                     )
                 )
-                val localParams = FrameLayout.LayoutParams(280, 210, Gravity.TOP or Gravity.END).apply {
-                    setMargins(12, 12, 12, 12)
+                val localParams = FrameLayout.LayoutParams(
+                    (280 * density).toInt(),
+                    (210 * density).toInt(),
+                    Gravity.TOP or Gravity.END
+                ).apply {
+                    val margin = (12 * density).toInt()
+                    setMargins(margin, margin, margin, margin)
                 }
                 container.addView(local, localParams)
                 engine.attachRenderers(local, remote)
