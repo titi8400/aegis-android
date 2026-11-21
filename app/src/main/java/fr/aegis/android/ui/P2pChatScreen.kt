@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.sp
 import fr.aegis.android.security.AndroidKeyStoreIdentity
 import fr.aegis.android.security.ConversationStore
 import fr.aegis.android.security.IncomingFileAssembler
+import fr.aegis.android.calls.P2pCallEngine
+import fr.aegis.android.security.P2pCallSignalCodec
 import fr.aegis.android.security.P2pFileTransferCodec
 import fr.aegis.android.security.ReceivedFileStore
 import fr.aegis.android.security.P2pLanDiscovery
@@ -99,6 +101,9 @@ fun P2pChatScreen(
     var listening by remember { mutableStateOf(false) }
     var ephemeralMinutes by remember { mutableStateOf(0) }
     var isSendingFile by remember { mutableStateOf(false) }
+    var callEngine by remember { mutableStateOf<P2pCallEngine?>(null) }
+    var callOpen by remember { mutableStateOf(false) }
+    var callStatus by remember { mutableStateOf("Appel non démarré.") }
     var isRecordingVoice by remember { mutableStateOf(false) }
     var audioRecorder by remember { mutableStateOf<AudioRecord?>(null) }
     var recordingStopFlag by remember { mutableStateOf<AtomicBoolean?>(null) }
@@ -345,6 +350,13 @@ fun P2pChatScreen(
     fun attachSession(connected: P2pLanTransport.SecureSession, label: String) {
         session?.close()
         session = connected
+        callEngine?.close()
+        callEngine = P2pCallEngine(
+            context = context,
+            sendSignalFrame = { connected.sendFrame(it) },
+            onStateChanged = { state -> mainHandler.post { callStatus = state } },
+            onIncomingOffer = { mainHandler.post { callOpen = true } }
+        )
         activePeerId = connected.remoteDeviceId
         receivedFiles.clear()
         runCatching { receivedFileStore.list() }.onSuccess { receivedFiles.addAll(it) }
@@ -362,6 +374,15 @@ fun P2pChatScreen(
             try {
                 while (connected.isOpen) {
                     val frame = connected.readFrame()
+                    if (P2pCallSignalCodec.isCallFrame(frame)) {
+                        val signal = P2pCallSignalCodec.decode(frame)
+                        frame.fill(0)
+                        mainHandler.post {
+                            callEngine?.handleSignal(signal)
+                                ?: run { error = "Moteur d'appel indisponible." }
+                        }
+                        continue
+                    }
                     if (P2pFileTransferCodec.isFilePacket(frame)) {
                         val packet = P2pFileTransferCodec.decode(frame)
                         frame.fill(0)
@@ -439,10 +460,24 @@ fun P2pChatScreen(
         }
         onDispose {
             recordingStopFlag?.set(false)
+            callEngine?.close()
             discovery.close()
             transport.close()
             session?.close()
         }
+    }
+
+    if (callOpen && callEngine != null) {
+        P2pCallScreen(
+            engine = callEngine!!,
+            callStatus = callStatus,
+            onClose = {
+                callEngine?.close()
+                callEngine = null
+                callOpen = false
+            }
+        )
+        return
     }
 
     Column(
@@ -552,6 +587,16 @@ fun P2pChatScreen(
             label = { Text("Message") },
             enabled = session != null
         )
+        Button(
+            onClick = {
+                callOpen = true
+                callStatus = "Prêt à établir une liaison média directe."
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = session != null,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00BFFF), contentColor = Color(0xFF00131D))
+        ) { Text("APPEL AUDIO / VIDÉO DIRECT") }
+
         Button(
             onClick = {
                 if (locationPermissionGranted) shareCurrentLocation()
