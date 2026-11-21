@@ -22,7 +22,11 @@ Ne publiez pas de vulnérabilité exploitable dans une issue publique. Contactez
 
 - Aucun secret, clé privée, PIN ou donnée personnelle dans Git.
 - Aucun chiffrement maison pour les messages.
-- Toute modification cryptographique doit être accompagnée de tests.
+- Toute modification cryptographique doit être accompagnée de tests unitaires et d’une revue de conception.
+- Les invitations QR sont signées ECDSA et limitées à cinq minutes ; seules les clés P-256 sont acceptées.
+- Les primitives de défi-réponse signées démontrent la possession des clés, mais ne suffisent pas sans comparaison indépendante des deux empreintes.
+- Les invitations déjà consommées sont inscrites dans un registre chiffré local ; une suppression des données ou un retour à un état antérieur du système peut contourner cet historique.
+- Les appareils approuvés sont prévus pour être conservés dans un répertoire chiffré local ; l’interface n’enregistre pas encore de pair.
 - Les clés publiques échangées doivent être authentifiées lors de l'appairage.
 - Les états d'échec et les limites P2P doivent être visibles à l'utilisateur.
 - Les sauvegardes Android doivent rester désactivées tant qu'une stratégie de sauvegarde chiffrée n'a pas été conçue et testée.
