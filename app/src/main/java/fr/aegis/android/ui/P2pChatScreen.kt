@@ -84,6 +84,7 @@ fun P2pChatScreen(
     val context = LocalContext.current
     val peerStore = remember { TrustedPeerStore(context.applicationContext) }
     val conversationStore = remember { ConversationStore(context.applicationContext) }
+    val outboxStore = remember { fr.aegis.android.security.OutboxStore(context.applicationContext) }
     val receivedFileStore = remember { ReceivedFileStore(context.applicationContext) }
     val receivedFiles = remember { mutableStateListOf<ReceivedFileStore.ReceivedFile>() }
     var pendingExportId by remember { mutableStateOf<String?>(null) }
@@ -98,6 +99,7 @@ fun P2pChatScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var session by remember { mutableStateOf<P2pLanTransport.SecureSession?>(null) }
     var activePeerId by remember { mutableStateOf<String?>(null) }
+    var pendingOutboxCount by remember { mutableStateOf(0) }
     var listening by remember { mutableStateOf(false) }
     var ephemeralMinutes by remember { mutableStateOf(0) }
     var isSendingFile by remember { mutableStateOf(false) }
@@ -372,6 +374,43 @@ fun P2pChatScreen(
             error = failure.message ?: "Impossible de lire l’historique chiffré."
         }
         status = "Connexion TLS mutuellement authentifiée : $label"
+        thread(name = "aegis-outbox-drain", isDaemon = true) {
+            try {
+                val pending = outboxStore.list(connected.remoteDeviceId)
+                var delivered = 0
+                for (item in pending) {
+                    if (!connected.isOpen) break
+                    val frame = P2pWireCodec.encodeText(
+                        item.body, item.createdAtEpochMs, item.expiresAtEpochMs, item.id
+                    )
+                    try {
+                        connected.sendFrame(frame)
+                        outboxStore.markSent(connected.remoteDeviceId, item.id)
+                        conversationStore.append(
+                            connected.remoteDeviceId,
+                            item.body,
+                            outgoing = true,
+                            nowEpochMs = System.currentTimeMillis(),
+                            expiresAtEpochMs = item.expiresAtEpochMs,
+                            messageId = item.id,
+                            createdAtEpochMs = item.createdAtEpochMs
+                        )
+                        delivered++
+                    } finally {
+                        frame.fill(0)
+                    }
+                }
+                mainHandler.post {
+                    pendingOutboxCount = runCatching { outboxStore.list(connected.remoteDeviceId).size }.getOrDefault(0)
+                    if (delivered > 0) status = "$delivered message(s) en attente transmis."
+                }
+            } catch (failure: Exception) {
+                mainHandler.post {
+                    pendingOutboxCount = runCatching { outboxStore.list(connected.remoteDeviceId).size }.getOrDefault(0)
+                    error = failure.message ?: "Transmission de la file d'attente impossible."
+                }
+            }
+        }
         val fileAssembler = IncomingFileAssembler()
         thread(name = "aegis-p2p-reader", isDaemon = true) {
             try {
@@ -435,6 +474,7 @@ fun P2pChatScreen(
     LaunchedEffect(activePeerId) {
         val peerId = activePeerId
         if (peerId != null) {
+            pendingOutboxCount = runCatching { outboxStore.list(peerId).size }.getOrDefault(0)
             while (true) {
                 delay(5_000)
                 runCatching { conversationStore.list(peerId) }
@@ -443,6 +483,7 @@ fun P2pChatScreen(
                         saved.forEach { history.add(ChatLine(it.outgoing, it.body, it.expiresAtEpochMs != null)) }
                     }
                     .onFailure { error = it.message ?: "Impossible de nettoyer l’historique." }
+                pendingOutboxCount = runCatching { outboxStore.list(peerId).size }.getOrDefault(0)
             }
         }
     }
@@ -492,6 +533,13 @@ fun P2pChatScreen(
         Text("AEGIS / LIAISON DIRECTE", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
         Text("TCP local • TLS 1.2/1.3 • authentification mutuelle par clés approuvées", color = Color(0xFF8292A3), fontSize = 10.sp)
         Text(status, color = if (session != null) Color(0xFF39D98A) else Color(0xFF00BFFF), fontSize = 11.sp)
+        if (activePeerId != null) {
+            Text(
+                "FILE D'ATTENTE CHIFFRÉE : $pendingOutboxCount message(s)",
+                color = if (pendingOutboxCount > 0) Color(0xFFFFC857) else Color(0xFF8292A3),
+                fontSize = 10.sp
+            )
+        }
         error?.let { Text(it, color = Color(0xFFFF7070), fontSize = 10.sp) }
         Text("IP locales : ${localIpv4Addresses().ifEmpty { listOf("indisponible") }.joinToString(" • ")}", color = Color(0xFF8292A3), fontSize = 10.sp)
         Text("Port : ${P2pLanTransport.DEFAULT_PORT}", color = Color(0xFF8292A3), fontSize = 10.sp)
@@ -590,7 +638,7 @@ fun P2pChatScreen(
             onValueChange = { message = it.take(4096) },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Message") },
-            enabled = session != null
+            enabled = activePeerId != null
         )
         Button(
             onClick = {
@@ -687,17 +735,20 @@ fun P2pChatScreen(
 
         Button(
             onClick = {
-                val current = session ?: return@Button
                 val body = message.trim()
-                if (body.isNotEmpty()) {
+                val peerId = activePeerId
+                if (body.isNotEmpty() && peerId != null) {
+                    val createdAt = System.currentTimeMillis()
+                    val expiresAt = if (ephemeralMinutes == 0) null else createdAt + ephemeralMinutes * 60_000L
+                    val messageId = UUID.randomUUID().toString()
                     try {
-                        val peerId = activePeerId ?: throw IllegalStateException("Identité du pair non disponible.")
-                        val createdAt = System.currentTimeMillis()
-                        val expiresAt = if (ephemeralMinutes == 0) null else createdAt + ephemeralMinutes * 60_000L
-                        val messageId = UUID.randomUUID().toString()
-                        val frame = P2pWireCodec.encodeText(body, createdAt, expiresAt, messageId)
-                        current.sendFrame(frame)
-                        frame.fill(0)
+                        outboxStore.enqueue(
+                            peerDeviceId = peerId,
+                            body = body,
+                            createdAtEpochMs = createdAt,
+                            expiresAtEpochMs = expiresAt,
+                            messageId = messageId
+                        )
                         conversationStore.append(
                             peerId,
                             body,
@@ -710,17 +761,44 @@ fun P2pChatScreen(
                         history.add(ChatLine(true, body, expiresAt != null))
                         message = ""
                         error = null
+                        val current = session
+                        if (current != null && current.isOpen) {
+                            thread(name = "aegis-outbox-send", isDaemon = true) {
+                                try {
+                                    val frame = P2pWireCodec.encodeText(body, createdAt, expiresAt, messageId)
+                                    try {
+                                        current.sendFrame(frame)
+                                        outboxStore.markSent(peerId, messageId)
+                                        mainHandler.post {
+                                            pendingOutboxCount = outboxStore.list(peerId).size
+                                            status = "Message transmis."
+                                        }
+                                    } finally {
+                                        frame.fill(0)
+                                    }
+                                } catch (failure: Exception) {
+                                    current.close()
+                                    mainHandler.post {
+                                        if (session === current) session = null
+                                        pendingOutboxCount = runCatching { outboxStore.list(peerId).size }.getOrDefault(0)
+                                        status = "Message conservé dans la file d'attente chiffrée."
+                                        error = failure.message
+                                    }
+                                }
+                            }
+                        } else {
+                            pendingOutboxCount = outboxStore.list(peerId).size
+                            status = "Message conservé ; il sera transmis à la reconnexion du pair."
+                        }
                     } catch (failure: Exception) {
-                        error = failure.message ?: "Envoi impossible."
-                        current.close()
-                        session = null
+                        error = failure.message ?: "Mise en attente du message impossible."
                     }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = session != null && message.isNotBlank(),
+            enabled = activePeerId != null && message.isNotBlank(),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39D98A), contentColor = Color(0xFF00150B))
-        ) { Text("ENVOYER") }
+        ) { Text(if (session != null) "ENVOYER" else "METTRE EN ATTENTE") }
 
         Button(
             onClick = onClose,
