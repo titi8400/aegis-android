@@ -4,7 +4,7 @@ AEGIS est une application Android native de communication privée, conçue autou
 
 ## État actuel
 
-**Version 0.13.0 — prototype P2P sur réseau local.**
+**Version 0.14.0 — prototype P2P sur réseau local.**
 
 | Brique | État |
 |---|---|
@@ -17,13 +17,13 @@ AEGIS est une application Android native de communication privée, conçue autou
 | Échange de messages texte sur cette connexion | Interface et transport implémentés |
 | Transfert de fichiers directs (20 Mio maximum) | Implémenté avec blocs de 512 Kio et contrôle SHA-256 |
 | Notes vocales | Enregistrement WAV jusqu’à 30 secondes, transfert et lecture locale |
-| Partage de position ponctuel | Implémenté avec autorisation et action explicites |
+| Partage de position ponctuel | Implémenté avec autorisation et action explicites |\n| Appels audio/vidéo directs | Première intégration WebRTC avec signalisation TLS, ICE hôte uniquement |
 | Stockage local des fichiers reçus | Chiffré AES-256-GCM |
 | Historique local par pair chiffré AES-256-GCM | Implémenté |
 | Messages texte éphémères (1 min, 1 h, 24 h) | Implémentés avec purge locale périodique |
 | Messages persistants chiffrés | À intégrer |
 | Pièces jointes, photos, vidéos et notes vocales | À développer |
-| Appels audio/vidéo | À développer |
+| Appels audio/vidéo | Première intégration WebRTC dans le code ; validation sur appareils physiques à faire |
 | Messages éphémères | Première version texte implémentée (1 min, 1 h, 24 h) |
 | Partage de position | À développer |
 | Récupération par deuxième appareil | À développer |
@@ -70,7 +70,7 @@ Les notes vocales sont enregistrées en PCM/WAV, limitées à 30 secondes, envoy
 
 ## Limites réseau importantes
 
-Cette version ne fait pas de traversée NAT, de relais TURN, de serveur de rendez-vous ou de connexion Internet directe automatique. Elle fonctionne uniquement si les appareils peuvent se joindre directement sur leur réseau IP. Les opérateurs mobiles, les pare-feu, les NAT, l'isolation Wi-Fi et les réseaux distincts peuvent empêcher une connexion. Il n'existe pas de garantie de connexion entre deux réseaux éloignés sans mécanisme de rendez-vous ou de traversée NAT ; l'ajout d'un relais serait contraire au choix d'architecture retenu.
+Les appels WebRTC sont configurés sans serveur STUN ni relais TURN et utilisent uniquement les candidats ICE locaux (host). Les appels nécessitent donc une connectivité IP directe, en pratique le même réseau local. Cette version ne fait pas de traversée NAT, de relais TURN, de serveur de rendez-vous ou de connexion Internet directe automatique. Elle fonctionne uniquement si les appareils peuvent se joindre directement sur leur réseau IP. Les opérateurs mobiles, les pare-feu, les NAT, l'isolation Wi-Fi et les réseaux distincts peuvent empêcher une connexion. Il n'existe pas de garantie de connexion entre deux réseaux éloignés sans mécanisme de rendez-vous ou de traversée NAT ; l'ajout d'un relais serait contraire au choix d'architecture retenu.
 
 ## Protections locales et limites
 
@@ -95,7 +95,7 @@ La CI GitHub exécute les tests unitaires JVM puis construit l'APK Debug. L'APK 
 
 ## Priorités de développement
 
-1. Valider le transport TLS sur plusieurs versions et fabricants Android.
+1. Tester l'appairage, la messagerie, les fichiers, la voix et les appels WebRTC sur deux téléphones physiques de marques et versions Android différentes.
 2. Ajouter une vraie couche de messages avec stockage local chiffré, gestion des accusés et des interruptions.
 3. Ajouter la reprise des transferts de fichiers interrompus et les accusés de réception.
 4. Concevoir appels audio/vidéo directs sans serveur ni relais, en documentant les limites NAT.
