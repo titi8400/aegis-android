@@ -594,6 +594,26 @@ fun P2pChatScreen(
             Text("FICHIERS REÇUS — COFFRE CHIFFRÉ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
             receivedFiles.forEach { file ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (file.mimeType == "audio/wav") {
+                        Button(
+                            onClick = {
+                                thread(name = "aegis-voice-playback", isDaemon = true) {
+                                    try {
+                                        val bytes = receivedFileStore.read(file.id) ?: throw IllegalStateException("Note vocale introuvable.")
+                                        try {
+                                            playWavBytes(bytes)
+                                            mainHandler.post { status = "Lecture terminée." }
+                                        } finally {
+                                            bytes.fill(0)
+                                        }
+                                    } catch (failure: Exception) {
+                                        mainHandler.post { error = failure.message ?: "Lecture audio impossible." }
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10233B), contentColor = Color(0xFF39D98A))
+                        ) { Text("ÉCOUTER") }
+                    }
                     Button(
                         onClick = {
                             pendingExportId = file.id
@@ -660,6 +680,57 @@ fun P2pChatScreen(
     }
 }
 
+
+private fun playWavBytes(bytes: ByteArray) {
+    require(bytes.size >= 44) { "Fichier WAV incomplet." }
+    val header = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+    val riff = String(bytes, 0, 4, Charsets.US_ASCII)
+    val wave = String(bytes, 8, 4, Charsets.US_ASCII)
+    require(riff == "RIFF" && wave == "WAVE") { "Format WAV invalide." }
+    val channels = header.getShort(22).toInt()
+    val sampleRate = header.getInt(24)
+    val bitsPerSample = header.getShort(34).toInt()
+    val dataSize = header.getInt(40)
+    require(channels == 1 && bitsPerSample == 16 && sampleRate in 8_000..48_000) {
+        "Format audio non pris en charge."
+    }
+    require(dataSize > 0 && dataSize <= bytes.size - 44 && dataSize % 2 == 0) {
+        "Données audio WAV invalides."
+    }
+    val audioFormat = AudioFormat.Builder()
+        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+        .setSampleRate(sampleRate)
+        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+        .build()
+    val attributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_MEDIA)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+        .build()
+    val track = AudioTrack.Builder()
+        .setAudioAttributes(attributes)
+        .setAudioFormat(audioFormat)
+        .setTransferMode(AudioTrack.MODE_STATIC)
+        .setBufferSizeInBytes(dataSize)
+        .build()
+    try {
+        var offset = 0
+        while (offset < dataSize) {
+            val written = track.write(bytes, 44 + offset, dataSize - offset, AudioTrack.WRITE_BLOCKING)
+            require(written > 0) { "Écriture audio interrompue." }
+            offset += written
+        }
+        track.play()
+        val expectedFrames = dataSize / 2
+        while (track.playbackHeadPosition < expectedFrames && track.playState == AudioTrack.PLAYSTATE_PLAYING) {
+            Thread.sleep(20)
+        }
+    } finally {
+        runCatching {
+            if (track.playState == AudioTrack.PLAYSTATE_PLAYING) track.stop()
+        }
+        track.release()
+    }
+}
 
 private fun createWavBytes(pcm: ByteArray, sampleRate: Int): ByteArray {
     require(pcm.isNotEmpty() && pcm.size <= 20 * 1024 * 1024 - 44) { "Note vocale trop volumineuse." }
