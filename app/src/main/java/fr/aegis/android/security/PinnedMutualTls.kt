@@ -9,11 +9,13 @@ import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
+import org.bouncycastle.operator.ContentSigner
+import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder
 import java.math.BigInteger
 import java.net.Socket
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.security.Signature
 import java.security.SecureRandom
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
@@ -92,9 +94,7 @@ internal object PinnedMutualTls {
             false,
             ExtendedKeyUsage(arrayOf(KeyPurposeId.id_kp_serverAuth, KeyPurposeId.id_kp_clientAuth))
         )
-        val signer = JcaContentSignerBuilder("SHA256withECDSA")
-            .setProvider(provider)
-            .build(identity.privateKeyForTls())
+        val signer = keystoreContentSigner(identity)
         return JcaX509CertificateConverter()
             .setProvider(provider)
             .getCertificate(builder.build(signer))
@@ -105,6 +105,28 @@ internal object PinnedMutualTls {
                     "Le certificat TLS ne correspond pas à l'identité AEGIS."
                 }
             }
+    }
+
+    private fun keystoreContentSigner(identity: AndroidKeyStoreIdentity): ContentSigner {
+        val signature = Signature.getInstance("SHA256withECDSA")
+        signature.initSign(identity.privateKeyForTls())
+        return object : ContentSigner {
+            private val algorithm = DefaultSignatureAlgorithmIdentifierFinder()
+                .find("SHA256withECDSA")
+
+            override fun getAlgorithmIdentifier() = algorithm
+            override fun getOutputStream(): OutputStream = object : OutputStream() {
+                override fun write(value: Int) {
+                    signature.update(value.toByte())
+                }
+
+                override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                    signature.update(bytes, offset, length)
+                }
+            }
+
+            override fun getSignature(): ByteArray = signature.sign()
+        }
     }
 
     private class DeviceKeyManager(
