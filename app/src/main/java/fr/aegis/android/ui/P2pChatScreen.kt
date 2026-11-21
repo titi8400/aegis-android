@@ -460,6 +460,7 @@ fun P2pChatScreen(
         }
         onDispose {
             recordingStopFlag?.set(false)
+            callEngine?.hangUp()
             callEngine?.close()
             discovery.close()
             transport.close()
@@ -472,6 +473,7 @@ fun P2pChatScreen(
             engine = callEngine!!,
             callStatus = callStatus,
             onClose = {
+                callEngine?.hangUp()
                 callEngine?.close()
                 callEngine = null
                 callOpen = false
