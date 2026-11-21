@@ -488,7 +488,7 @@ fun AegisApp() {
 
             Spacer(Modifier.height(28.dp))
             Text(
-                text = "VERSION 0.6.0 • PROTOTYPE",
+                text = "VERSION 0.7.0 • PROTOTYPE",
                 color = Muted,
                 fontSize = 10.sp,
                 letterSpacing = 1.5.sp
