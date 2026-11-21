@@ -77,6 +77,7 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
                 PairingScanMode.CHALLENGE -> {
                     val expected = localInvite ?: error("Crée d’abord ton invitation locale.")
                     val challenge = PairingHandshakeCodec.verifyChallenge(payload, expected)
+                    replayGuard.consume("inviteuse", expected.nonce, expected.expiresAtEpochMs)
                     replayGuard.consume("challenge", challenge.challengeNonce, challenge.createdAtEpochMs + 90_000L)
                     verifiedChallenge = challenge
                     remoteFingerprint = challenge.challengerFingerprint
@@ -160,6 +161,7 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
                         val invite = remoteInvite ?: error("Invitation absente.")
                         val encoded = PairingHandshakeCodec.createChallenge(invite, identity)
                         val challenge = PairingHandshakeCodec.verifyChallenge(encoded, invite)
+                        replayGuard.consume("inviteuse", invite.nonce, invite.expiresAtEpochMs)
                         replayGuard.consume("challenge", challenge.challengeNonce, challenge.createdAtEpochMs + 90_000L)
                         verifiedChallenge = challenge
                         challengeQr = PairingQrGenerator.generate(encoded)
