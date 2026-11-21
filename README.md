@@ -4,7 +4,7 @@ AEGIS est un projet de communication Android de pair à pair (P2P), destiné à 
 
 ## État du projet
 
-**Version 0.3.0 — prototype en développement.** Le dépôt contient une application Android native Kotlin/Jetpack Compose, un écran de verrouillage PIN/biométrie et une première primitive d'identité avec Android Keystore. Ce n'est pas encore une messagerie opérationnelle ni un produit audité.
+**Version 0.4.0 — prototype en développement.** Le dépôt contient une application Android native Kotlin/Jetpack Compose, un écran de verrouillage PIN/biométrie et une première primitive d'identité avec Android Keystore. Ce n'est pas encore une messagerie opérationnelle ni un produit audité.
 
 ## Fonctions présentes dans le prototype
 
@@ -14,7 +14,10 @@ AEGIS est un projet de communication Android de pair à pair (P2P), destiné à 
 - Verrouillage après 60 secondes sans interaction et lorsque l'application passe en arrière-plan.
 - Temporisation progressive après les échecs de PIN.
 - Après 10 échecs comptabilisés, suppression de la clé d'identité Android Keystore et réinitialisation du verrouillage local.
-- Création manuelle d'une identité de signature ECDSA P-256 dans Android Keystore.
+- Création d'une identité de signature ECDSA P-256 dans Android Keystore.
+- Création d'invitations d'appairage signées, limitées à cinq minutes.
+- Génération d'un QR code à partir de l'invitation signée.
+- Vérification locale de la signature et calcul de l'empreinte SHA-256 de la clé publique.
 
 **Attention :** la suppression après 10 échecs concerne uniquement l'identité cryptographique de ce prototype. Elle ne constitue pas un effacement garanti de toutes les données du téléphone. Le compteur local est modifiable par un attaquant ayant le contrôle de l'appareil, pouvant effacer les données de l'application ou restaurer un état antérieur. Le coffre de fichiers chiffrés est disponible comme primitive technique, mais il n'est pas encore relié à une base de messages ni à l'interface.
 
@@ -27,6 +30,12 @@ AEGIS est un projet de communication Android de pair à pair (P2P), destiné à 
 - Données : coffre local de fichiers AES-256-GCM, clé dédiée non exportable via Android Keystore, fichiers placés dans le répertoire interne exclu des sauvegardes Android.
 - Récupération : deuxième appareil de confiance, avec approbation explicite des deux appareils.
 - Interface : sombre, technique, accents cyan.
+
+## Appairage QR — première étape
+
+`PairingInviteCodec` crée une invitation temporaire contenant un identifiant d'appareil, la clé publique, un nonce aléatoire et une expiration à cinq minutes. L'ensemble est signé avec la clé privée ECDSA P-256 conservée dans Android Keystore. `PairingQrGenerator` transforme cette invitation en QR code. Le vérificateur contrôle le format, les dates et la signature, puis calcule l'empreinte SHA-256 de la clé publique.
+
+Le QR ne contient aucune clé privée. Cette étape ne constitue pas encore un appairage complet : le scanner, la confirmation utilisateur, la comparaison de l'empreinte par un canal indépendant, la consommation persistante du nonce et le défi-réponse prouvant la possession de la clé privée distante restent à développer. Tant que ces étapes ne sont pas terminées, il ne faut pas considérer un appareil comme authentifié ni lui faire confiance.
 
 ## Coffre local chiffré (première primitive)
 
@@ -49,8 +58,8 @@ Ouvrir le dossier dans Android Studio, avec JDK 17 et Gradle 8.11.1 ou compatibl
 ## Étapes prévues
 
 1. Socle Android, interface et primitives locales.
-2. Identité cryptographique, QR d'appairage authentifié et intégration du coffre local chiffré.
-3. Transport P2P local et échanges de messages.
+2. Terminer l'appairage mutuel QR : scan, comparaison d'empreinte, nonce à usage unique et défi-réponse signé.
+3. Intégrer le coffre chiffré, puis transport P2P local et échanges de messages.
 4. Transport Internet direct, avec indication claire des limites de connectivité.
 5. Audio/vidéo direct et fichiers.
 6. Tests de sécurité, revue cryptographique et audit indépendant.
