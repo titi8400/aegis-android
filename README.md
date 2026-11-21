@@ -15,7 +15,8 @@ AEGIS est une application Android native de communication privée, conçue autou
 | Découverte des appareils approuvés sur le même LAN | Implémentée |
 | Connexion TCP directe avec TLS mutuel et épinglage de clés | Implémentée dans le code |
 | Échange de messages texte sur cette connexion | Interface et transport implémentés |
-| Historique local par pair chiffré AES-256-GCM | Implémenté |\n| Messages texte éphémères (1 min, 1 h, 24 h) | Implémentés avec purge locale périodique |
+| Historique local par pair chiffré AES-256-GCM | Implémenté |
+| Messages texte éphémères (1 min, 1 h, 24 h) | Implémentés avec purge locale périodique |
 | Messages persistants chiffrés | À intégrer |
 | Pièces jointes, photos, vidéos et notes vocales | À développer |
 | Appels audio/vidéo | À développer |
