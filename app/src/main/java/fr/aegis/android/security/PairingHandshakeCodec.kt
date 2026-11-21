@@ -78,6 +78,7 @@ object PairingHandshakeCodec {
             "Format de défi AEGIS invalide"
         }
         require(f[2] == expectedInvite.deviceId) { "Défi destiné à un autre appareil" }
+        require(nowEpochMs <= expectedInvite.expiresAtEpochMs) { "Invitation initiale expirée" }
         val inviteNonce = decode(f[3], NONCE_BYTES)
         require(MessageDigest.isEqual(inviteNonce, expectedInvite.nonce)) { "Invitation non correspondante" }
         val challengerId = f[4]
@@ -111,6 +112,7 @@ object PairingHandshakeCodec {
         responderIdentity: AndroidKeyStoreIdentity
     ): String {
         require(challenge.inviteDeviceId == responderInvite.deviceId) { "Défi destiné à une autre identité" }
+        require(System.currentTimeMillis() <= challenge.createdAtEpochMs + VALIDITY_MS) { "Défi expiré" }
         require(MessageDigest.isEqual(challenge.inviteNonce, responderInvite.nonce)) { "Nonce d’invitation incorrect" }
         val publicKey = responderIdentity.publicKeyEncoded()
         require(MessageDigest.isEqual(publicKey, responderInvite.publicKeyEncoded)) {
@@ -132,8 +134,10 @@ object PairingHandshakeCodec {
     fun verifyResponse(
         encoded: String,
         challenge: VerifiedChallenge,
-        expectedResponder: PairingInviteCodec.VerifiedInvite
+        expectedResponder: PairingInviteCodec.VerifiedInvite,
+        nowEpochMs: Long = System.currentTimeMillis()
     ): VerifiedHandshake {
+        require(nowEpochMs <= challenge.createdAtEpochMs + VALIDITY_MS) { "Défi expiré" }
         require(encoded.length <= 4096) { "Réponse trop volumineuse" }
         val f = encoded.split('|')
         require(f.size == 9 && f[0] == PREFIX_RESPONSE && f[1] == VERSION) {
