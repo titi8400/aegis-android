@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.aegis.android.security.AndroidKeyStoreIdentity
+import fr.aegis.android.security.P2pLanDiscovery
 import fr.aegis.android.security.P2pLanTransport
 import fr.aegis.android.security.TrustedPeerStore
 import java.net.Inet4Address
@@ -48,9 +49,10 @@ fun P2pChatScreen(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
-    val transport = remember {
-        P2pLanTransport(identity, TrustedPeerStore(context.applicationContext))
-    }
+    val peerStore = remember { TrustedPeerStore(context.applicationContext) }
+    val transport = remember { P2pLanTransport(identity, peerStore) }
+    val discovery = remember { P2pLanDiscovery(identity, peerStore) }
+    val discoveredPeers = remember { mutableStateListOf<P2pLanDiscovery.DiscoveredPeer>() }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     val history = remember { mutableStateListOf<ChatLine>() }
     var host by remember { mutableStateOf("") }
@@ -86,7 +88,24 @@ fun P2pChatScreen(
     }
 
     DisposableEffect(Unit) {
-        onDispose { transport.close(); session?.close() }
+        try {
+            discovery.start(
+                onPeerFound = { peer ->
+                    mainHandler.post {
+                        val index = discoveredPeers.indexOfFirst { it.deviceId == peer.deviceId }
+                        if (index >= 0) discoveredPeers[index] = peer else discoveredPeers.add(peer)
+                    }
+                },
+                onError = { failure -> mainHandler.post { error = failure.message } }
+            )
+        } catch (failure: Exception) {
+            error = failure.message ?: "Découverte locale indisponible."
+        }
+        onDispose {
+            discovery.close()
+            transport.close()
+            session?.close()
+        }
     }
 
     Column(
@@ -99,6 +118,18 @@ fun P2pChatScreen(
         error?.let { Text(it, color = Color(0xFFFF7070), fontSize = 10.sp) }
         Text("IP locales : ${localIpv4Addresses().ifEmpty { listOf("indisponible") }.joinToString(" • ")}", color = Color(0xFF8292A3), fontSize = 10.sp)
         Text("Port : ${P2pLanTransport.DEFAULT_PORT}", color = Color(0xFF8292A3), fontSize = 10.sp)
+        Text("APPAREILS DE CONFIANCE DÉTECTÉS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        if (discoveredPeers.isEmpty()) {
+            Text("Recherche des appareils approuvés sur le même réseau local…", color = Color(0xFF8292A3), fontSize = 10.sp)
+        } else {
+            discoveredPeers.forEach { peer ->
+                Button(
+                    onClick = { host = peer.address },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10233B), contentColor = Color(0xFF00BFFF))
+                ) { Text("${peer.displayName} • ${peer.address} • PORT ${peer.port}") }
+            }
+        }
 
         Button(
             onClick = {
