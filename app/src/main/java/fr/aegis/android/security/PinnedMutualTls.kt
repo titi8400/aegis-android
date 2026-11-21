@@ -11,6 +11,7 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.ContentSigner
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder
+import java.io.OutputStream
 import java.math.BigInteger
 import java.net.Socket
 import java.security.KeyStore
