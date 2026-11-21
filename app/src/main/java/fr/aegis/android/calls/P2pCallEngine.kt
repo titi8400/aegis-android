@@ -82,6 +82,9 @@ class P2pCallEngine(
         remoteVideoTrack?.addSink(remote)
     }
 
+    val hasPendingIncomingOffer: Boolean get() = pendingOffer != null
+    val hasActiveCall: Boolean get() = callId != null
+
     fun startOutgoingCall() {
         check(!closed) { "Moteur d'appel fermé." }
         check(hasPermission(Manifest.permission.RECORD_AUDIO)) {
