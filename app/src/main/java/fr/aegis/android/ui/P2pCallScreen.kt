@@ -40,6 +40,8 @@ fun P2pCallScreen(
     val context = LocalContext.current
     BackHandler(enabled = true, onBack = onClose)
     var started by remember { mutableStateOf(false) }
+    var microphoneMuted by remember { mutableStateOf(false) }
+    var cameraDisabled by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
@@ -123,6 +125,24 @@ fun P2pCallScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00BFFF), contentColor = Color(0xFF00131D))
             ) { Text("LANCER L’APPEL AUDIO / VIDÉO") }
         } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        microphoneMuted = !microphoneMuted
+                        engine.setMicrophoneEnabled(!microphoneMuted)
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10233B), contentColor = Color.White)
+                ) { Text(if (microphoneMuted) "MICRO COUPÉ" else "COUPER MICRO") }
+                Button(
+                    onClick = {
+                        cameraDisabled = !cameraDisabled
+                        engine.setCameraEnabled(!cameraDisabled)
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10233B), contentColor = Color.White)
+                ) { Text(if (cameraDisabled) "CAMÉRA COUPÉE" else "COUPER CAMÉRA") }
+            }
             Button(
                 onClick = { engine.hangUp(); onClose() },
                 modifier = Modifier.fillMaxWidth(),
