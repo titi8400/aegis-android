@@ -399,7 +399,10 @@ fun AegisApp() {
                         }
                         Spacer(Modifier.height(12.dp))
                         Button(
-                            onClick = { networkOpen = true },
+                            onClick = {
+                                if (identity.exists()) networkOpen = true
+                                else identityError = "Initialise d’abord ton identité AEGIS."
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Color(0xFF00131D)),
                             shape = RoundedCornerShape(10.dp)
