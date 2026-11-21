@@ -52,11 +52,13 @@ fun PairingQrScanner(
     val executor = remember { Executors.newSingleThreadExecutor() }
     val barcodeScanner = remember { BarcodeScanning.getClient() }
     val providerState = remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    val disposed = remember { AtomicBoolean(false) }
     DisposableEffect(Unit) {
         onDispose {
+            disposed.set(true)
             providerState.value?.unbindAll()
             barcodeScanner.close()
-            executor.shutdown()
+            executor.shutdownNow()
         }
     }
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -83,7 +85,12 @@ fun PairingQrScanner(
                     val providerFuture = ProcessCameraProvider.getInstance(ctx)
                                         val delivered = AtomicBoolean(false)
                     providerFuture.addListener({
+                        if (disposed.get()) return@addListener
                         val provider = providerFuture.get()
+                        if (disposed.get()) {
+                            provider.unbindAll()
+                            return@addListener
+                        }
                         providerState.value = provider
                         val preview = Preview.Builder().build().also {
                             it.surfaceProvider = previewView.surfaceProvider
@@ -92,6 +99,10 @@ fun PairingQrScanner(
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                             .build()
                         analysis.setAnalyzer(executor) { proxy ->
+                            if (disposed.get()) {
+                                proxy.close()
+                                return@setAnalyzer
+                            }
                             val mediaImage = proxy.image
                             if (mediaImage == null || delivered.get()) {
                                 proxy.close()
