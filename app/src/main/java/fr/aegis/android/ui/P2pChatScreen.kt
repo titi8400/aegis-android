@@ -357,6 +357,7 @@ fun P2pChatScreen(
     fun attachSession(connected: P2pLanTransport.SecureSession, label: String) {
         session?.close()
         session = connected
+        callEngine?.hangUp()
         callEngine?.close()
         callEngine = createCallEngine(connected)
         activePeerId = connected.remoteDeviceId
