@@ -1,86 +1,97 @@
 # AEGIS — Android
 
-AEGIS est un projet de communication Android de pair à pair (P2P), destiné à la famille et aux proches.
+AEGIS est une application Android native de communication privée, conçue autour d'une architecture pair à pair. Le dépôt est un prototype technique : il ne doit pas être utilisé pour des communications sensibles avant des essais sur appareils réels et un audit indépendant.
 
-## État du projet
+## État actuel
 
-**Version 0.8.0 — prototype en développement.** Le dépôt contient une application Android native Kotlin/Jetpack Compose, un écran de verrouillage PIN/biométrie et une première primitive d'identité avec Android Keystore. Ce n'est pas encore une messagerie opérationnelle ni un produit audité.
+**Version 0.9.0 — prototype P2P sur réseau local.**
 
-## Fonctions présentes dans le prototype
+| Brique | État |
+|---|---|
+| Verrouillage PIN et biométrie | Implémenté |
+| Identité ECDSA P-256 dans Android Keystore | Implémentée |
+| Appairage QR mutuel hors ligne | Implémenté |
+| Registre local chiffré des appareils approuvés | Implémenté |
+| Découverte des appareils approuvés sur le même LAN | Implémentée |
+| Connexion TCP directe avec TLS mutuel et épinglage de clés | Implémentée dans le code |
+| Échange de messages texte sur cette connexion | Interface et transport implémentés |
+| Messages persistants chiffrés | À intégrer |
+| Pièces jointes, photos, vidéos et notes vocales | À développer |
+| Appels audio/vidéo | À développer |
+| Messages éphémères | À développer |
+| Partage de position | À développer |
+| Récupération par deuxième appareil | À développer |
+| Tests sur deux téléphones physiques et audit indépendant | À réaliser |
 
-- Configuration d'un PIN indépendant de 6 à 12 chiffres.
-- Vérification du PIN par PBKDF2-HMAC-SHA256 avec sel aléatoire.
-- Authentification biométrique forte via AndroidX BiometricPrompt lorsque l'appareil la prend en charge.
-- Verrouillage après 60 secondes sans interaction et lorsque l'application passe en arrière-plan.
-- Temporisation progressive après les échecs de PIN.
-- Après 10 échecs comptabilisés, suppression de la clé d'identité Android Keystore et réinitialisation du verrouillage local.
-- Création d'une identité de signature ECDSA P-256 dans Android Keystore, avec identifiant d’appareil stable dérivé de la clé publique.
-- Création d'invitations d'appairage signées, limitées à cinq minutes.
-- Génération et affichage dans l’application d’un QR code à partir de l’invitation signée, valable cinq minutes.
-- Scan des QR d'invitation avec CameraX et ML Kit, après autorisation caméra.
-- Vérification locale de la signature, rejet des clés EC qui ne sont pas P-256 et calcul de l'empreinte SHA-256 de la clé publique.
-- Primitives de défi-réponse ECDSA signées pour démontrer la possession des clés des deux appareils.
-- Historique anti-rejeu persistant et chiffré pour les invitations consommées.
-- Assistant d’appairage QR hors ligne : invitation, défi signé, réponse signée, comparaison des empreintes et approbation explicite.
-- Répertoire local des appareils de confiance chiffré, alimenté après preuve d’appairage mutuel et confirmation utilisateur.
+Le code de transport LAN est une première implémentation et n'a pas encore été validé sur deux appareils physiques. La réussite de la compilation et des tests unitaires ne prouve pas à elle seule le bon fonctionnement réseau ni la sécurité de bout en bout.
 
-**Attention :** la suppression après 10 échecs concerne uniquement l'identité cryptographique de ce prototype. Elle ne constitue pas un effacement garanti de toutes les données du téléphone. Le compteur local est modifiable par un attaquant ayant le contrôle de l'appareil, pouvant effacer les données de l'application ou restaurer un état antérieur. Le coffre de fichiers chiffrés est disponible comme primitive technique, mais il n'est pas encore relié à une base de messages ni à l'interface.
+## Architecture technique
 
-## Décisions d'architecture
+- Android natif : Kotlin, Jetpack Compose, minSdk 26.
+- Identité : clé ECDSA P-256 générée localement dans Android Keystore ; la clé privée n'est pas exportée par l'API de l'application.
+- Appairage : invitations QR signées, défi-réponse signé, comparaison indépendante des empreintes SHA-256 et approbation manuelle.
+- Répertoire de confiance : métadonnées chiffrées dans le coffre local AES-256-GCM.
+- Réseau local : découverte UDP limitée au LAN, puis connexion TCP directe.
+- Authentification réseau : TLS mutuel avec certificat d'identité temporaire signé par la clé Android Keystore et vérification de la clé publique par rapport au répertoire local des appareils approuvés.
+- Trames applicatives : longueur préfixée, taille maximale de 1 Mio.
+- Aucun serveur applicatif, service de rendez-vous ou relais n'est utilisé.
 
-- Android natif : Kotlin, Jetpack Compose.
-- Communication visée : P2P strict, sans serveur applicatif ni relais.
-- Identité : paire de clés créée localement ; seule la clé publique sera partagée via QR code.
-- Clé privée : Android Keystore, non exportable par cette API ; protection matérielle selon les capacités de l'appareil.
-- Données : coffre local de fichiers AES-256-GCM, clé dédiée non exportable via Android Keystore, fichiers placés dans le répertoire interne exclu des sauvegardes Android.
-- Récupération : deuxième appareil de confiance, avec approbation explicite des deux appareils.
-- Interface : sombre, technique, accents cyan.
+## Appairage QR hors ligne
 
-## Appairage QR — première étape
+1. Sur l'appareil A, initialise l'identité et crée une invitation QR.
+2. Sur l'appareil B, scanne l'invitation.
+3. B crée un défi signé et affiche le QR correspondant.
+4. A scanne le défi et génère la réponse signée.
+5. B scanne la réponse.
+6. Les deux personnes comparent les empreintes SHA-256 complètes par un canal indépendant.
+7. Chaque appareil enregistre explicitement l'autre dans son répertoire local.
 
-`PairingInviteCodec` crée une invitation temporaire contenant un identifiant d'appareil, la clé publique, un nonce aléatoire et une expiration à cinq minutes. L'ensemble est signé avec la clé privée ECDSA P-256 conservée dans Android Keystore. `PairingQrGenerator` transforme cette invitation en QR code. Le vérificateur contrôle le format, les dates et la signature, puis calcule l'empreinte SHA-256 de la clé publique.
+L'invitation expire après cinq minutes ; le défi et la réponse après 90 secondes. Le QR ne contient aucune clé privée. Une confirmation cochée dans l'application ne remplace pas la comparaison indépendante réelle.
 
-Le QR ne contient aucune clé privée. Cette étape ne constitue pas encore un appairage complet : le scanner, la confirmation utilisateur, la comparaison de l'empreinte par un canal indépendant, la consommation persistante du nonce et le défi-réponse prouvant la possession de la clé privée distante restent à développer. Tant que ces étapes ne sont pas terminées, il ne faut pas considérer un appareil comme authentifié ni lui faire confiance.
+## Première connexion P2P locale
 
-## Utilisation de l’appairage QR hors ligne
+1. Les deux appareils doivent être appairés et avoir enregistré mutuellement leurs clés.
+2. Ils doivent être connectés au même réseau Wi-Fi ou LAN ; les réseaux invités avec isolation des clients peuvent bloquer les connexions.
+3. Ouvre « Messagerie P2P locale » sur les deux appareils.
+4. L'écran recherche les appareils de confiance via des annonces UDP locales.
+5. Sur l'un des appareils, active « Attendre un pair ».
+6. Sur l'autre, sélectionne l'appareil détecté puis appuie sur « Connecter ».
+7. Après validation du certificat et de la clé épinglée par TLS mutuel, les messages texte peuvent être échangés directement.
 
-1. Sur l’appareil A, initialise l’identité et crée une invitation QR.
-2. Sur l’appareil B, ouvre l’assistant et scanne l’invitation de A.
-3. Sur B, crée le défi signé et présente le QR à A.
-4. Sur A, scanne le défi et génère la réponse signée.
-5. Sur B, scanne la réponse.
-6. Sur les deux appareils, comparez les empreintes SHA-256 complètes par un canal indépendant (en personne ou par un canal déjà fiable).
-7. Cochez la confirmation et enregistrez l’autre appareil sur chaque téléphone.
+Le port TCP est 39841 et le port UDP de découverte est 39842. Ces ports ne sont utilisés que sur le réseau local. La découverte UDP est une indication de présence, jamais une preuve d'identité ; seule la négociation TLS mutuellement authentifiée autorise la session.
 
-L’invitation expire après cinq minutes ; le défi et la réponse après 90 secondes. En cas d’expiration ou d’erreur, créez une nouvelle invitation. Cet échange ne nécessite aucun serveur ni connexion Internet : les QR sont transférés visuellement entre les téléphones.
+## Limites réseau importantes
 
-## Coffre local chiffré (première primitive)
+Cette version ne fait pas de traversée NAT, de relais TURN, de serveur de rendez-vous ou de connexion Internet directe automatique. Elle fonctionne uniquement si les appareils peuvent se joindre directement sur leur réseau IP. Les opérateurs mobiles, les pare-feu, les NAT, l'isolation Wi-Fi et les réseaux distincts peuvent empêcher une connexion. Il n'existe pas de garantie de connexion entre deux réseaux éloignés sans mécanisme de rendez-vous ou de traversée NAT ; l'ajout d'un relais serait contraire au choix d'architecture retenu.
 
-`EncryptedFileStore` fournit des opérations de dépôt, lecture, suppression et présence d'enregistrements identifiés. Chaque enregistrement est chiffré avec AES-256-GCM ; le nonce est généré par le fournisseur cryptographique Android et l'identifiant du fichier est authentifié comme donnée associée. Le format de fichier est versionné et les écritures passent par un fichier temporaire synchronisé avant renommage. La clé AES est distincte de la clé de signature d'identité.
+## Protections locales et limites
 
-Cette primitive n'est pas encore une base de données transactionnelle, un système de synchronisation, ni une sauvegarde/récupération. La suppression d'un fichier ou de la clé ne garantit pas l'effacement physique des blocs flash. Il faut encore ajouter des tests sur appareils Android, traiter les erreurs de perte/invalidation de clé et intégrer une couche de dépôt applicative avant d'y stocker des conversations.
+- PIN de 6 à 12 chiffres, vérifié par PBKDF2-HMAC-SHA256 avec sel aléatoire.
+- Authentification biométrique forte via AndroidX BiometricPrompt si disponible.
+- Verrouillage après 60 secondes d'inactivité et au passage en arrière-plan.
+- Temporisation progressive des tentatives PIN.
+- Au dixième échec enregistré, suppression de la clé d'identité et réinitialisation du verrouillage local.
+- Coffre local AES-256-GCM utilisant une clé Android Keystore distincte.
 
-## Limites à ne pas masquer
+Le compteur PIN est stocké dans les préférences privées de l'application et n'est pas inviolable. Un attaquant contrôlant le système peut manipuler les données, l'horloge ou l'état restauré. La suppression d'une clé ou d'un fichier ne garantit pas l'effacement physique de toutes les cellules flash. La sécurité dépend également de l'intégrité du système Android et des appareils des correspondants.
 
-Le P2P strict ne garantit pas qu'une connexion Internet directe soit possible entre deux téléphones. NAT, pare-feu, opérateurs et réseaux Wi-Fi peuvent empêcher la connexion. Sans serveur de découverte ni relais, certains pairs ne pourront pas se joindre à distance.
+## Construction
 
-Le vérificateur PIN utilise les préférences privées de l'application ; ce stockage n'est pas une frontière inviolable. PBKDF2 ralentit les essais hors ligne mais ne rend pas un PIN court impossible à deviner. Le compteur et l'heure de verrouillage ne sont pas résistants à une modification du système.
+- Android Studio
+- JDK 17
+- Android Gradle Plugin 8.9.2
+- Gradle 8.11.1
+- compileSdk 35, minSdk 26, targetSdk 35
 
-La suppression de clés ne garantit pas l'effacement physique de chaque bloc de mémoire flash. Un appareil compromis peut exposer les données pendant leur utilisation. Aucun niveau de sécurité maximal ne peut être revendiqué avant revue de conception, tests et audit indépendant.
+La CI GitHub exécute les tests unitaires JVM puis construit l'APK Debug. L'APK Debug n'est pas une version de production signée pour distribution.
 
-## Ouvrir le projet
+## Priorités de développement
 
-Ouvrir le dossier dans Android Studio, avec JDK 17 et Gradle 8.11.1 ou compatible avec Android Gradle Plugin 8.9.2, synchroniser Gradle, puis lancer la configuration app sur un appareil ou émulateur Android.
+1. Valider le transport TLS sur plusieurs versions et fabricants Android.
+2. Ajouter une vraie couche de messages avec stockage local chiffré, gestion des accusés et des interruptions.
+3. Ajouter les transferts de fichiers par blocs, reprise et limites de taille.
+4. Concevoir appels audio/vidéo directs sans serveur ni relais, en documentant les limites NAT.
+5. Concevoir la récupération par second appareil sans exporter de clé privée.
+6. Faire réaliser une revue cryptographique et un audit indépendant avant utilisation réelle.
 
-## Étapes prévues
-
-1. Socle Android, interface et primitives locales.
-2. Ajouter le transport P2P direct chiffré entre appareils approuvés, sans serveur ni relais.
-3. Intégrer le coffre chiffré, puis transport P2P local et échanges de messages.
-4. Transport Internet direct, avec indication claire des limites de connectivité.
-5. Audio/vidéo direct et fichiers.
-6. Tests de sécurité, revue cryptographique et audit indépendant.
-
-## Sécurité du développement
-
-Ne jamais ajouter de clé privée, secret, PIN, sauvegarde de clés ou donnée personnelle dans Git. Ne pas inventer de protocole cryptographique : privilégier des protocoles normalisés et des implémentations maintenues, après validation de leur licence et de leur compatibilité.
+Ne jamais ajouter de clé privée, secret, PIN, donnée personnelle ou fichier de sauvegarde sensible dans Git.
