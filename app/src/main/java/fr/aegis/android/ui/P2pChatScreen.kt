@@ -2,6 +2,12 @@ package fr.aegis.android.ui
 
 import android.provider.OpenableColumns
 import android.Manifest
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.AudioTrack
+import android.media.MediaRecorder
+import android.os.SystemClock
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
@@ -63,6 +69,9 @@ import kotlin.concurrent.thread
 import kotlinx.coroutines.delay
 import java.util.UUID
 import java.util.Locale
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicBoolean
 
 private data class ChatLine(val outgoing: Boolean, val body: String, val ephemeral: Boolean = false)
 
@@ -91,12 +100,104 @@ fun P2pChatScreen(
     var listening by remember { mutableStateOf(false) }
     var ephemeralMinutes by remember { mutableStateOf(0) }
     var isSendingFile by remember { mutableStateOf(false) }
+    var isRecordingVoice by remember { mutableStateOf(false) }
+    var audioRecorder by remember { mutableStateOf<AudioRecord?>(null) }
+    var recordingStopFlag by remember { mutableStateOf<AtomicBoolean?>(null) }
     var locationPermissionGranted by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         )
     }
+    fun startVoiceRecording() {
+        val current = session
+        if (current == null) {
+            error = "Aucun pair connecté."
+            return
+        }
+        try {
+            val sampleRate = 16_000
+            val channelMask = AudioFormat.CHANNEL_IN_MONO
+            val encoding = AudioFormat.ENCODING_PCM_16BIT
+            val minBuffer = AudioRecord.getMinBufferSize(sampleRate, channelMask, encoding)
+            require(minBuffer > 0) { "Enregistrement audio non pris en charge." }
+            val recorder = AudioRecord.Builder()
+                .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(channelMask)
+                        .setEncoding(encoding)
+                        .build()
+                )
+                .setBufferSizeInBytes(maxOf(minBuffer * 2, 8_192))
+                .build()
+            check(recorder.state == AudioRecord.STATE_INITIALIZED) {
+                "Microphone indisponible sur cet appareil."
+            }
+            val stopFlag = AtomicBoolean(true)
+            recorder.startRecording()
+            audioRecorder = recorder
+            recordingStopFlag = stopFlag
+            isRecordingVoice = true
+            status = "Enregistrement vocal — maximum 30 secondes."
+            thread(name = "aegis-voice-note", isDaemon = true) {
+                val pcmOutput = ByteArrayOutputStream()
+                val buffer = ByteArray(8_192)
+                try {
+                    val startedAt = SystemClock.elapsedRealtime()
+                    while (stopFlag.get() && SystemClock.elapsedRealtime() - startedAt < 30_000L) {
+                        val count = recorder.read(buffer, 0, buffer.size)
+                        if (count > 0) pcmOutput.write(buffer, 0, count)
+                        else if (count < 0) throw IllegalStateException("Erreur de lecture du microphone.")
+                    }
+                    if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop()
+                    val pcm = pcmOutput.toByteArray()
+                    require(pcm.isNotEmpty()) { "Aucun son enregistré." }
+                    val wav = createWavBytes(pcm, sampleRate)
+                    pcm.fill(0)
+                    sendFileBytes(
+                        current,
+                        "note-vocale-${System.currentTimeMillis()}.wav",
+                        "audio/wav",
+                        wav
+                    )
+                    mainHandler.post {
+                        status = "Note vocale transmise."
+                        error = null
+                    }
+                } catch (failure: Exception) {
+                    mainHandler.post { error = failure.message ?: "Enregistrement ou envoi vocal impossible." }
+                } finally {
+                    buffer.fill(0)
+                    pcmOutput.reset()
+                    runCatching {
+                        if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop()
+                    }
+                    recorder.release()
+                    mainHandler.post {
+                        audioRecorder = null
+                        recordingStopFlag = null
+                        isRecordingVoice = false
+                    }
+                }
+            }
+        } catch (failure: Exception) {
+            audioRecorder?.let { runCatching { it.release() } }
+            audioRecorder = null
+            recordingStopFlag = null
+            isRecordingVoice = false
+            error = failure.message ?: "Impossible de démarrer l’enregistrement."
+        }
+    }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startVoiceRecording()
+        else error = "Autorisation microphone refusée."
+    }
+
     fun shareCurrentLocation() {
         val current = session
         val peerId = activePeerId
@@ -465,6 +566,25 @@ fun P2pChatScreen(
         ) { Text("PARTAGER MA POSITION ACTUELLE") }
 
         Button(
+            onClick = {
+                if (isRecordingVoice) {
+                    recordingStopFlag?.set(false)
+                    status = "Finalisation de la note vocale…"
+                } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    startVoiceRecording()
+                } else {
+                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = session != null,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isRecordingVoice) Color(0xFF7A2630) else Color(0xFF10233B),
+                contentColor = Color.White
+            )
+        ) { Text(if (isRecordingVoice) "ARRÊTER ET ENVOYER LA NOTE VOCALE" else "ENREGISTRER UNE NOTE VOCALE (30 S)") }
+
+        Button(
             onClick = { importLauncher.launch(arrayOf("*/*")) },
             modifier = Modifier.fillMaxWidth(),
             enabled = session != null && !isSendingFile,
@@ -541,6 +661,28 @@ fun P2pChatScreen(
     }
 }
 
+
+private fun createWavBytes(pcm: ByteArray, sampleRate: Int): ByteArray {
+    require(pcm.isNotEmpty() && pcm.size <= 20 * 1024 * 1024 - 44) { "Note vocale trop volumineuse." }
+    val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
+    header.put("RIFF".toByteArray(Charsets.US_ASCII))
+    header.putInt(36 + pcm.size)
+    header.put("WAVE".toByteArray(Charsets.US_ASCII))
+    header.put("fmt ".toByteArray(Charsets.US_ASCII))
+    header.putInt(16)
+    header.putShort(1.toShort())
+    header.putShort(1.toShort())
+    header.putInt(sampleRate)
+    header.putInt(sampleRate * 2)
+    header.putShort(2.toShort())
+    header.putShort(16.toShort())
+    header.put("data".toByteArray(Charsets.US_ASCII))
+    header.putInt(pcm.size)
+    return ByteArray(44 + pcm.size).also {
+        header.array().copyInto(it, 0)
+        pcm.copyInto(it, 44)
+    }
+}
 
 private fun sendFileBytes(
     session: P2pLanTransport.SecureSession,
