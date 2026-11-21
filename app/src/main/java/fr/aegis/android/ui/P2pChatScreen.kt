@@ -105,9 +105,13 @@ fun P2pChatScreen(
             return
         }
         val manager = context.getSystemService(android.content.Context.LOCATION_SERVICE) as LocationManager
+        val hasFinePermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
         val provider = when {
-            manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+            hasFinePermission && manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
             manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+            hasFinePermission && manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
             else -> {
                 error = "Aucun fournisseur de localisation activé."
                 return
