@@ -346,6 +346,7 @@ class P2pCallEngine(
         localDescriptionSignaled = false
         remoteDescriptionSet = false
         callId = null
+        pendingOffer = null
     }
 
     override fun close() {
