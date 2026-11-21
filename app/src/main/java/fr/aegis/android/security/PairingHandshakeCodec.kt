@@ -59,6 +59,7 @@ object PairingHandshakeCodec {
         nowEpochMs: Long = System.currentTimeMillis()
     ): String {
         require(challengerIdentity.exists()) { "Identité locale absente" }
+        require(nowEpochMs <= invite.expiresAtEpochMs) { "Invitation expirée" }
         require(isCanonicalUuid(challengerDeviceId)) { "Identifiant local invalide" }
         val nonce = randomNonce()
         val publicKey = challengerIdentity.publicKeyEncoded()
