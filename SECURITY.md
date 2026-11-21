@@ -20,7 +20,8 @@ AEGIS est un prototype Android. La version 0.14 contient un appairage QR hors li
 - Les messages texte peuvent porter une date d'expiration locale (1 minute, 1 heure ou 24 heures) ; leur purge dépend de l'exécution de l'application et ne peut pas effacer les copies déjà consultées, exportées ou capturées par le destinataire.
 - Les fichiers reçus sont limités à 20 Mio, assemblés en mémoire, vérifiés par SHA-256 puis chiffrés dans le coffre local. Les blocs incomplets ne sont pas repris ; le contenu existe temporairement en mémoire vive pendant le transfert.
 - Les notes vocales sont enregistrées après autorisation microphone, limitées à 30 secondes et transmises dans le canal TLS direct sous forme de fichier WAV.
-- Le partage de position est déclenché explicitement par l'utilisateur ; les coordonnées sont envoyées comme message texte dans la session TLS. Le destinataire peut les conserver ou les copier.\n- Les appels audio/vidéo utilisent une signalisation dans la session TLS et WebRTC/DTLS-SRTP pour les médias. Aucun serveur STUN/TURN n'est configuré ; seuls les candidats ICE hôtes sont utilisés. La connectivité est donc limitée aux pairs directement joignables, généralement sur le même LAN. Le code d'appel n'a pas encore été audité ni validé sur appareils physiques.
+- Le partage de position est déclenché explicitement par l'utilisateur ; les coordonnées sont envoyées comme message texte dans la session TLS. Le destinataire peut les conserver ou les copier.
+- Les appels audio/vidéo utilisent une signalisation dans la session TLS et WebRTC/DTLS-SRTP pour les médias. Aucun serveur STUN/TURN n'est configuré ; seuls les candidats ICE hôtes sont utilisés. La connectivité est donc limitée aux pairs directement joignables, généralement sur le même LAN. Le code d'appel n'a pas encore été audité ni validé sur appareils physiques.
 
 ## Limites connues
 
