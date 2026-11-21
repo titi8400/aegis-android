@@ -111,7 +111,6 @@ fun P2pChatScreen(
         val provider = when {
             hasFinePermission && manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
             manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-            hasFinePermission && manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
             else -> {
                 error = "Aucun fournisseur de localisation activé."
                 return
