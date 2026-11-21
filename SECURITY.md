@@ -2,11 +2,21 @@
 
 ## Périmètre actuel
 
-Le dépôt est un prototype en construction. Il ne doit pas être utilisé pour protéger des communications sensibles. La présence d'Android Keystore dans le code ne signifie pas que l'application complète est sécurisée.
+AEGIS est un prototype en construction. Ne l'utilisez pas pour protéger des communications sensibles. La présence d'Android Keystore, d'un PIN et de BiometricPrompt ne signifie pas que l'application complète est sécurisée.
+
+## Comportement du prototype
+
+- Le PIN est représenté par un vérificateur PBKDF2-HMAC-SHA256 salé.
+- La biométrie passe par AndroidX BiometricPrompt et l'authentificateur biométrique fort de l'appareil.
+- L'application se verrouille après 60 secondes sans interaction ou quand elle passe en arrière-plan.
+- Les tentatives incorrectes déclenchent une temporisation progressive.
+- Au dixième échec enregistré, la clé d'identité de signature locale est supprimée et le verrouillage PIN est réinitialisé.
+
+Cette suppression n'efface pas l'intégralité des données de l'application ni les blocs physiques de mémoire. Le compteur et l'horodatage de verrouillage sont conservés dans les préférences privées de l'application : ils ne résistent pas à un appareil compromis, à l'effacement des données, à une restauration d'état ou à une manipulation de l'horloge. Ce mécanisme est un comportement de prototype, pas une garantie anti-forensique.
 
 ## Signalement
 
-Ne publiez pas de vulnérabilité exploitable dans une issue publique. Pour le moment, contactez le propriétaire du dépôt par un canal privé avant toute divulgation.
+Ne publiez pas de vulnérabilité exploitable dans une issue publique. Contactez le propriétaire du dépôt par un canal privé avant toute divulgation.
 
 ## Principes obligatoires
 
