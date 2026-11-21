@@ -1,7 +1,5 @@
 package fr.aegis.android.ui
 
-import android.content.Intent
-import android.database.Cursor
 import android.provider.OpenableColumns
 import android.os.Handler
 import android.os.Looper
@@ -50,7 +48,6 @@ import fr.aegis.android.security.P2pWireCodec
 import fr.aegis.android.security.TrustedPeerStore
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
-import java.util.UUID
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.nio.charset.StandardCharsets
@@ -90,10 +87,13 @@ fun P2pChatScreen(
         if (uri != null && fileId != null) {
             thread(name = "aegis-file-export", isDaemon = true) {
                 try {
-                    val bytes = receivedFileStore.read(fileId) ?: error("Fichier reçu introuvable.")
-                    context.contentResolver.openOutputStream(uri, "w")?.use { output -> output.write(bytes) }
-                        ?: error("Impossible d’écrire le fichier exporté.")
-                    bytes.fill(0)
+                    val bytes = receivedFileStore.read(fileId) ?: throw IllegalStateException("Fichier reçu introuvable.")
+                    try {
+                        context.contentResolver.openOutputStream(uri, "w")?.use { output -> output.write(bytes) }
+                            ?: throw IllegalStateException("Impossible d’écrire le fichier exporté.")
+                    } finally {
+                        bytes.fill(0)
+                    }
                     mainHandler.post { status = "Fichier exporté dans l’emplacement choisi." }
                 } catch (failure: Exception) {
                     mainHandler.post { error = failure.message ?: "Export du fichier impossible." }
@@ -118,7 +118,7 @@ fun P2pChatScreen(
                     }
                     val safeName = P2pFileTransferCodec.sanitizeFileName(name)
                     val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
-                    if (reportedSize > P2pFileTransferCodec.MAX_FILE_BYTES) error("Fichier supérieur à 20 Mio.")
+                    if (reportedSize > P2pFileTransferCodec.MAX_FILE_BYTES) throw IllegalArgumentException("Fichier supérieur à 20 Mio.")
                     val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
                         val output = ByteArrayOutputStream()
                         val buffer = ByteArray(64 * 1024)
@@ -132,7 +132,7 @@ fun P2pChatScreen(
                         }
                         buffer.fill(0)
                         output.toByteArray()
-                    } ?: error("Impossible de lire le fichier sélectionné.")
+                    } ?: throw IllegalStateException("Impossible de lire le fichier sélectionné.")
                     require(bytes.isNotEmpty()) { "Fichier vide." }
                     val transferId = UUID.randomUUID().toString()
                     current.sendFrame(P2pFileTransferCodec.encodeStart(
@@ -398,7 +398,7 @@ fun P2pChatScreen(
                 val body = message.trim()
                 if (body.isNotEmpty()) {
                     try {
-                        val peerId = activePeerId ?: error("Identité du pair non disponible.")
+                        val peerId = activePeerId ?: throw IllegalStateException("Identité du pair non disponible.")
                         val createdAt = System.currentTimeMillis()
                         val expiresAt = if (ephemeralMinutes == 0) null else createdAt + ephemeralMinutes * 60_000L
                         val messageId = UUID.randomUUID().toString()
