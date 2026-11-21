@@ -54,6 +54,17 @@ class AndroidKeyStoreIdentity(
         }
     }
 
+    /**
+     * Returns the Android Keystore private-key handle for TLS key management.
+     * The key material remains non-exportable; callers receive only the
+     * platform PrivateKey handle and must never serialize it.
+     */
+    internal fun privateKeyForTls(): java.security.PrivateKey {
+        val entry = loadKeyStore().getEntry(alias, null) as? KeyStore.PrivateKeyEntry
+            ?: error("Identité AEGIS absente")
+        return entry.privateKey
+    }
+
     override fun exists(): Boolean = loadKeyStore().containsAlias(alias)
 
     fun delete(): Boolean {
