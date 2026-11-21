@@ -19,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +49,16 @@ fun PairingQrScanner(
     }
     var permissionDenied by remember { mutableStateOf(false) }
     var scanError by remember { mutableStateOf<String?>(null) }
+    val executor = remember { Executors.newSingleThreadExecutor() }
+    val barcodeScanner = remember { BarcodeScanning.getClient() }
+    val providerState = remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    DisposableEffect(Unit) {
+        onDispose {
+            providerState.value?.unbindAll()
+            barcodeScanner.close()
+            executor.shutdown()
+        }
+    }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -70,11 +81,10 @@ fun PairingQrScanner(
                 factory = { ctx ->
                     val previewView = PreviewView(ctx)
                     val providerFuture = ProcessCameraProvider.getInstance(ctx)
-                    val executor = Executors.newSingleThreadExecutor()
-                    val barcodeScanner = BarcodeScanning.getClient()
-                    val delivered = AtomicBoolean(false)
+                                        val delivered = AtomicBoolean(false)
                     providerFuture.addListener({
                         val provider = providerFuture.get()
+                        providerState.value = provider
                         val preview = Preview.Builder().build().also {
                             it.surfaceProvider = previewView.surfaceProvider
                         }
