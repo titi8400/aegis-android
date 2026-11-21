@@ -221,11 +221,13 @@ object PairingHandshakeCodec {
         require(signature.size in 8..MAX_SIGNATURE_BYTES) { "Signature invalide" }
         val key = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(publicKey))
         require(key is ECPublicKey) { "Clé EC requise" }
-        val valid = Signature.getInstance("SHA256withECDSA").run {
-            initVerify(key)
-            update(data)
-            verify(signature)
-        }
+        val valid = runCatching {
+            Signature.getInstance("SHA256withECDSA").run {
+                initVerify(key)
+                update(data)
+                verify(signature)
+            }
+        }.getOrDefault(false)
         require(valid) { "Signature cryptographique invalide" }
     }
 
