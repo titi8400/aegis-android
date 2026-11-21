@@ -31,22 +31,28 @@ class ConversationStore(context: Context) {
         outgoing: Boolean,
         nowEpochMs: Long = System.currentTimeMillis(),
         expiresAtEpochMs: Long? = null,
-        messageId: String = UUID.randomUUID().toString()
+        messageId: String = UUID.randomUUID().toString(),
+        createdAtEpochMs: Long = nowEpochMs
     ): Message {
         validatePeerId(peerDeviceId)
         require(body.isNotBlank() && body.length <= MAX_MESSAGE_CHARS) {
             "Message vide ou trop long."
         }
-        require(expiresAtEpochMs == null || expiresAtEpochMs > nowEpochMs) {
+        require(createdAtEpochMs in 1L..(nowEpochMs + 30_000L)) { "Date de message invalide." }
+        require(expiresAtEpochMs == null || expiresAtEpochMs > nowEpochMs && expiresAtEpochMs > createdAtEpochMs) {
             "Expiration de message invalide."
         }
+        require(runCatching { UUID.fromString(messageId).toString() == messageId }.getOrDefault(false)) {
+            "Identifiant de message invalide."
+        }
         val messages = read(peerDeviceId).filter { it.expiresAtEpochMs == null || it.expiresAtEpochMs > nowEpochMs }.toMutableList()
+        messages.firstOrNull { it.id == messageId }?.let { return it }
         val message = Message(
             id = messageId,
             peerDeviceId = peerDeviceId,
             body = body,
             outgoing = outgoing,
-            createdAtEpochMs = nowEpochMs,
+            createdAtEpochMs = createdAtEpochMs,
             expiresAtEpochMs = expiresAtEpochMs
         )
         messages.add(message)
