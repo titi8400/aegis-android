@@ -72,6 +72,7 @@ fun P2pCallScreen(
                 val container = FrameLayout(viewContext)
                 val remote = SurfaceViewRenderer(viewContext)
                 val local = SurfaceViewRenderer(viewContext)
+                local.setZOrderMediaOverlay(true)
                 container.addView(
                     remote,
                     FrameLayout.LayoutParams(
