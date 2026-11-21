@@ -98,6 +98,7 @@ object PairingInviteCodec {
 
         val nonce = decode(fields[5], NONCE_BYTES)
         val publicKey = decode(fields[6], MAX_PUBLIC_KEY_BYTES)
+        require(deviceId == deviceIdForPublicKey(publicKey)) { "Identifiant d’appareil non lié à sa clé publique" }
         val signature = decode(fields[7], MAX_SIGNATURE_BYTES)
         val unsigned = canonical(deviceId, createdAt, expiresAt, nonce, publicKey)
 
