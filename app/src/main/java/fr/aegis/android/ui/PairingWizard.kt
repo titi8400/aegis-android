@@ -136,9 +136,9 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
                     remoteFingerprint = null
                     fingerprintsCompared = false
                     status = "Invitation créée. Fais scanner ce QR par l’autre appareil."
-                    error = null
+                    errorMessage = null
                 } catch (failure: Exception) {
-                    error = failure.message ?: "Impossible de créer l’invitation."
+                    errorMessage = failure.message ?: "Impossible de créer l’invitation."
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -166,9 +166,9 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
                         remoteFingerprint = invite.fingerprintSha256
                         fingerprintsCompared = false
                         status = "Défi créé. Fais scanner ce QR par l’appareil qui a généré l’invitation."
-                        error = null
+                        errorMessage = null
                     } catch (failure: Exception) {
-                        error = failure.message ?: "Impossible de créer le défi."
+                        errorMessage = failure.message ?: "Impossible de créer le défi."
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -198,9 +198,9 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
                         responseQr = PairingQrGenerator.generate(packageData.encoded)
                         fingerprintsCompared = false
                         status = "Réponse créée. Fais scanner ce QR par l’appareil qui a créé le défi."
-                        error = null
+                        errorMessage = null
                     } catch (failure: Exception) {
-                        error = failure.message ?: "Impossible de créer la réponse."
+                        errorMessage = failure.message ?: "Impossible de créer la réponse."
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -253,9 +253,9 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
                         )
                         peers = peerStore.listPeers()
                         status = "Appareil enregistré localement comme appareil de confiance."
-                        error = null
+                        errorMessage = null
                     } catch (failure: Exception) {
-                        error = failure.message ?: "Enregistrement impossible."
+                        errorMessage = failure.message ?: "Enregistrement impossible."
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
