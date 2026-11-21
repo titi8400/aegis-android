@@ -71,6 +71,25 @@ object P2pWireCodec {
         return TextMessage(id, body, createdAt, expiresAt)
     }
 
+    fun encodeAck(messageId: String): ByteArray {
+        validateUuid(messageId)
+        return "$ACK_PREFIX|$VERSION|$messageId".toByteArray(StandardCharsets.US_ASCII)
+    }
+
+    fun isAckFrame(frame: ByteArray): Boolean =
+        frame.size <= MAX_ACK_FRAME_BYTES &&
+            frame.toString(StandardCharsets.US_ASCII).startsWith("$ACK_PREFIX|")
+
+    fun decodeAck(frame: ByteArray): String {
+        require(frame.isNotEmpty() && frame.size <= MAX_ACK_FRAME_BYTES) { "Accusé AEGIS invalide." }
+        val fields = frame.toString(StandardCharsets.US_ASCII).split('|')
+        require(fields.size == 3 && fields[0] == ACK_PREFIX && fields[1] == VERSION) {
+            "Format d'accusé AEGIS non pris en charge."
+        }
+        validateUuid(fields[2])
+        return fields[2]
+    }
+
     private fun validateBody(body: String) {
         require(body.isNotBlank() && body.length <= MAX_BODY_CHARS) {
             "Message vide ou trop long."
@@ -84,7 +103,9 @@ object P2pWireCodec {
     }
 
     private const val PREFIX = "AEGIS-TEXT"
+    private const val ACK_PREFIX = "AEGIS-ACK"
     private const val VERSION = "1"
+    private const val MAX_ACK_FRAME_BYTES = 128
     private const val MAX_BODY_CHARS = 4_096
     private const val MAX_BODY_BYTES = 16 * 1024
     private const val MAX_FRAME_BYTES = 32 * 1024
