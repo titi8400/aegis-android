@@ -76,7 +76,7 @@ fun PairingQrScanner(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("SCANNER UNE INVITATION AEGIS", color = Color.White)
+        Text("SCANNER UN QR D’APPARIEMENT AEGIS", color = Color.White)
         if (hasPermission) {
             AndroidView(
                 modifier = Modifier.fillMaxWidth().height(420.dp),
