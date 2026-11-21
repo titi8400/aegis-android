@@ -2,6 +2,7 @@ package fr.aegis.android.security
 
 import java.nio.charset.StandardCharsets
 import java.security.KeyPairGenerator
+import java.security.spec.ECGenParameterSpec
 import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 import java.util.Base64
@@ -44,6 +45,17 @@ class PairingInviteCodecTest {
         assertThrows(IllegalArgumentException::class.java) {
             PairingInviteCodec.verify(encoded, nowEpochMs = 310_001L)
         }
+    }
+
+    @Test
+    fun deviceIdIsStableForTheSamePublicIdentity() {
+        val generator = KeyPairGenerator.getInstance("EC")
+        generator.initialize(ECGenParameterSpec("secp256r1"))
+        val publicKey = generator.generateKeyPair().public.encoded
+        assertEquals(
+            PairingInviteCodec.deviceIdForPublicKey(publicKey),
+            PairingInviteCodec.deviceIdForPublicKey(publicKey)
+        )
     }
 
     @Test
