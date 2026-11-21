@@ -347,16 +347,18 @@ fun P2pChatScreen(
         }
     }
 
+    fun createCallEngine(connected: P2pLanTransport.SecureSession) = P2pCallEngine(
+        context = context,
+        sendSignalFrame = { connected.sendFrame(it) },
+        onStateChanged = { state -> mainHandler.post { callStatus = state } },
+        onIncomingOffer = { mainHandler.post { callOpen = true } }
+    )
+
     fun attachSession(connected: P2pLanTransport.SecureSession, label: String) {
         session?.close()
         session = connected
         callEngine?.close()
-        callEngine = P2pCallEngine(
-            context = context,
-            sendSignalFrame = { connected.sendFrame(it) },
-            onStateChanged = { state -> mainHandler.post { callStatus = state } },
-            onIncomingOffer = { mainHandler.post { callOpen = true } }
-        )
+        callEngine = createCallEngine(connected)
         activePeerId = connected.remoteDeviceId
         receivedFiles.clear()
         runCatching { receivedFileStore.list() }.onSuccess { receivedFiles.addAll(it) }
@@ -475,7 +477,7 @@ fun P2pChatScreen(
             onClose = {
                 callEngine?.hangUp()
                 callEngine?.close()
-                callEngine = null
+                callEngine = session?.let(::createCallEngine)
                 callOpen = false
             }
         )
