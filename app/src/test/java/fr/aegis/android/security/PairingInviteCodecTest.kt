@@ -2,11 +2,9 @@ package fr.aegis.android.security
 
 import java.nio.charset.StandardCharsets
 import java.security.KeyPairGenerator
-import java.security.spec.ECGenParameterSpec
 import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 import java.util.Base64
-import java.util.UUID
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -70,7 +68,7 @@ class PairingInviteCodecTest {
         val generator = KeyPairGenerator.getInstance("EC")
         generator.initialize(ECGenParameterSpec(curve))
         val keyPair = generator.generateKeyPair()
-        val deviceId = UUID.randomUUID().toString()
+        val deviceId = PairingInviteCodec.deviceIdForPublicKey(keyPair.public.encoded)
         val nonce = ByteArray(32) { 7 }
         val encoder = Base64.getUrlEncoder().withoutPadding()
         val nonceText = encoder.encodeToString(nonce)
