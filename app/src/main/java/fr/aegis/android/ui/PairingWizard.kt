@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,7 +59,13 @@ fun PairingWizard(identity: AndroidKeyStoreIdentity, onClose: () -> Unit) {
     var fingerprintsCompared by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Aucun appairage en cours.") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var peers by remember { mutableStateOf(peerStore.listPeers()) }
+    var peers by remember { mutableStateOf(emptyList<TrustedPeerStore.Peer>()) }
+
+    LaunchedEffect(Unit) {
+        runCatching { peerStore.listPeers() }
+            .onSuccess { peers = it }
+            .onFailure { errorMessage = it.message ?: "Répertoire d’appareils illisible." }
+    }
 
     fun handleScan(payload: String) {
         try {
