@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.aegis.android.security.AndroidKeyStoreIdentity
+import fr.aegis.android.security.ConversationStore
 import fr.aegis.android.security.P2pLanDiscovery
 import fr.aegis.android.security.P2pLanTransport
 import fr.aegis.android.security.TrustedPeerStore
@@ -50,6 +51,7 @@ fun P2pChatScreen(
 ) {
     val context = LocalContext.current
     val peerStore = remember { TrustedPeerStore(context.applicationContext) }
+    val conversationStore = remember { ConversationStore(context.applicationContext) }
     val transport = remember { P2pLanTransport(identity, peerStore) }
     val discovery = remember { P2pLanDiscovery(identity, peerStore) }
     val discoveredPeers = remember { mutableStateListOf<P2pLanDiscovery.DiscoveredPeer>() }
@@ -60,19 +62,29 @@ fun P2pChatScreen(
     var status by remember { mutableStateOf("Hors connexion — aucun pair connecté.") }
     var error by remember { mutableStateOf<String?>(null) }
     var session by remember { mutableStateOf<P2pLanTransport.SecureSession?>(null) }
+    var activePeerId by remember { mutableStateOf<String?>(null) }
     var listening by remember { mutableStateOf(false) }
 
     fun attachSession(connected: P2pLanTransport.SecureSession, label: String) {
         session?.close()
         session = connected
+        activePeerId = connected.remoteDeviceId
+        history.clear()
+        try {
+            conversationStore.list(connected.remoteDeviceId).forEach { saved ->
+                history.add(ChatLine(saved.outgoing, saved.body))
+            }
+        } catch (failure: Exception) {
+            error = failure.message ?: "Impossible de lire l’historique chiffré."
+        }
         status = "Connexion TLS mutuellement authentifiée : $label"
-        error = null
         thread(name = "aegis-p2p-reader", isDaemon = true) {
             try {
                 while (connected.isOpen) {
                     val frame = connected.readFrame()
                     val text = frame.toString(StandardCharsets.UTF_8)
                     frame.fill(0)
+                    conversationStore.append(connected.remoteDeviceId, text, outgoing = false)
                     mainHandler.post { history.add(ChatLine(false, text)) }
                 }
             } catch (failure: Exception) {
@@ -216,6 +228,8 @@ fun P2pChatScreen(
                 if (body.isNotEmpty()) {
                     try {
                         current.sendFrame(body.toByteArray(StandardCharsets.UTF_8))
+                        val peerId = activePeerId ?: error("Identité du pair non disponible.")
+                        conversationStore.append(peerId, body, outgoing = true)
                         history.add(ChatLine(true, body))
                         message = ""
                         error = null
