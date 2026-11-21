@@ -15,7 +15,7 @@ import java.security.KeyStore
  */
 class AndroidKeyStoreIdentity(
     private val alias: String = DEFAULT_ALIAS
-) {
+) : SigningIdentity {
     fun createIfAbsent(): Boolean {
         val keyStore = loadKeyStore()
         if (keyStore.containsAlias(alias)) return false
@@ -38,13 +38,13 @@ class AndroidKeyStoreIdentity(
         return true
     }
 
-    fun publicKeyEncoded(): ByteArray {
+    override fun publicKeyEncoded(): ByteArray {
         val entry = loadKeyStore().getEntry(alias, null) as? KeyStore.PrivateKeyEntry
             ?: error("Identité AEGIS absente")
         return entry.certificate.publicKey.encoded
     }
 
-    fun sign(data: ByteArray): ByteArray {
+    override fun sign(data: ByteArray): ByteArray {
         val entry = loadKeyStore().getEntry(alias, null) as? KeyStore.PrivateKeyEntry
             ?: error("Identité AEGIS absente")
         return java.security.Signature.getInstance("SHA256withECDSA").run {
@@ -54,7 +54,7 @@ class AndroidKeyStoreIdentity(
         }
     }
 
-    fun exists(): Boolean = loadKeyStore().containsAlias(alias)
+    override fun exists(): Boolean = loadKeyStore().containsAlias(alias)
 
     fun delete(): Boolean {
         val keyStore = loadKeyStore()
