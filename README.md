@@ -4,7 +4,7 @@ AEGIS est une application Android native de communication privée, conçue autou
 
 ## État actuel
 
-**Version 0.12.0 — prototype P2P sur réseau local.**
+**Version 0.13.0 — prototype P2P sur réseau local.**
 
 | Brique | État |
 |---|---|
@@ -15,7 +15,7 @@ AEGIS est une application Android native de communication privée, conçue autou
 | Découverte des appareils approuvés sur le même LAN | Implémentée |
 | Connexion TCP directe avec TLS mutuel et épinglage de clés | Implémentée dans le code |
 | Échange de messages texte sur cette connexion | Interface et transport implémentés |
-| Transfert de fichiers directs (20 Mio maximum) | Implémenté avec blocs de 512 Kio et contrôle SHA-256 |
+| Transfert de fichiers directs (20 Mio maximum) | Implémenté avec blocs de 512 Kio et contrôle SHA-256 |\n| Notes vocales | Enregistrement WAV jusqu’à 30 secondes, transfert et lecture locale |\n| Partage de position ponctuel | Implémenté avec autorisation et action explicites |
 | Stockage local des fichiers reçus | Chiffré AES-256-GCM |
 | Historique local par pair chiffré AES-256-GCM | Implémenté |
 | Messages texte éphémères (1 min, 1 h, 24 h) | Implémentés avec purge locale périodique |
@@ -63,6 +63,8 @@ L'invitation expire après cinq minutes ; le défi et la réponse après 90 seco
 7. Après validation du certificat et de la clé épinglée par TLS mutuel, les messages texte et fichiers peuvent être échangés directement. Les fichiers sont limités à 20 Mio ; ils sont assemblés en mémoire, vérifiés par SHA-256 puis enregistrés dans le coffre chiffré.
 
 Le port TCP est 39841 et le port UDP de découverte est 39842. Ces ports ne sont utilisés que sur le réseau local. La découverte UDP est une indication de présence, jamais une preuve d'identité ; seule la négociation TLS mutuellement authentifiée autorise la session.
+
+Les notes vocales sont enregistrées en PCM/WAV, limitées à 30 secondes, envoyées comme fichiers et lues depuis le coffre local chiffré. Le partage de position est déclenché manuellement et peut être configuré comme message éphémère.
 
 ## Limites réseau importantes
 
