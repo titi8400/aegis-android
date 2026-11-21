@@ -15,7 +15,6 @@ import android.location.LocationManager
 import android.os.Looper
 import android.os.Bundle
 import android.os.Handler
-import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
