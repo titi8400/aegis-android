@@ -1,106 +1,107 @@
 # AEGIS — Android
 
-AEGIS est une application Android native de communication privée, conçue autour d'une architecture pair à pair. Le dépôt est un prototype technique : il ne doit pas être utilisé pour des communications sensibles avant des essais sur appareils réels et un audit indépendant.
+AEGIS est un prototype Android natif de communication privée pair à pair. Il est conçu pour fonctionner sans serveur applicatif ni relais. Il ne doit pas être utilisé pour des communications sensibles avant des essais sur appareils physiques et un audit indépendant.
 
-## État actuel
+## État du projet
 
-**Version 0.14.0 — prototype P2P sur réseau local.**
+**Version 0.15.0 — prototype P2P sur réseau local.**
 
-| Brique | État |
+| Fonction | État |
 |---|---|
 | Verrouillage PIN et biométrie | Implémenté |
 | Identité ECDSA P-256 dans Android Keystore | Implémentée |
 | Appairage QR mutuel hors ligne | Implémenté |
-| Registre local chiffré des appareils approuvés | Implémenté |
+| Répertoire local chiffré des appareils approuvés | Implémenté |
+| Sélection d'un correspondant approuvé, même hors ligne | Implémentée |
 | Découverte des appareils approuvés sur le même LAN | Implémentée |
-| Connexion TCP directe avec TLS mutuel et épinglage de clés | Implémentée dans le code |
-| Échange de messages texte sur cette connexion | Interface et transport implémentés |
-| Transfert de fichiers directs (20 Mio maximum) | Implémenté avec blocs de 512 Kio et contrôle SHA-256 |
-| Notes vocales | Enregistrement WAV jusqu’à 30 secondes, transfert et lecture locale |
-| Partage de position ponctuel | Implémenté avec autorisation et action explicites |
-| Appels audio/vidéo directs | Première intégration WebRTC avec signalisation TLS, ICE hôte uniquement |
+| Connexion TCP directe avec TLS mutuel et épinglage des clés | Implémentée dans le code |
+| Messages texte et historique local chiffré | Implémentés |
+| File d'attente hors ligne chiffrée | Implémentée, 200 messages maximum par correspondant |
+| Accusé de livraison applicatif | Le destinataire confirme l'enregistrement local avant retrait de la file d'attente |
+| Messages texte éphémères | Implémentés : 1 min, 1 h et 24 h |
+| Transfert de fichiers | Implémenté jusqu'à 20 Mio, blocs de 512 Kio, vérification SHA-256 |
 | Stockage local des fichiers reçus | Chiffré AES-256-GCM |
-| Historique local par pair chiffré AES-256-GCM | Implémenté |
-| Messages texte éphémères (1 min, 1 h, 24 h) | Implémentés avec purge locale périodique |
-| Messages persistants chiffrés | À intégrer |
-| Pièces jointes, photos, vidéos et notes vocales | À développer |
-| Appels audio/vidéo | Première intégration WebRTC dans le code ; validation sur appareils physiques à faire |
-| Messages éphémères | Première version texte implémentée (1 min, 1 h, 24 h) |
-| Partage de position | À développer |
-| Récupération par deuxième appareil | À développer |
-| Tests sur deux téléphones physiques et audit indépendant | À réaliser |
+| Notes vocales | WAV, 30 secondes maximum, transfert comme fichier |
+| Partage de position ponctuel | Implémenté avec autorisation et action explicites |
+| Appels audio/vidéo | Première intégration WebRTC, signalisation TLS, ICE hôte uniquement |
+| Reprise de transfert de fichiers interrompu | À développer |
+| Récupération des données par deuxième appareil | À développer |
+| Tests sur deux téléphones physiques | À réaliser |
+| Audit cryptographique indépendant | À réaliser |
 
-Le code de transport LAN est une première implémentation et n'a pas encore été validé sur deux appareils physiques. La réussite de la compilation et des tests unitaires ne prouve pas à elle seule le bon fonctionnement réseau ni la sécurité de bout en bout. L'historique local est conservé par appareil ; il n'est pas synchronisé entre les appareils.
+La compilation et les tests automatisés ne prouvent pas le bon fonctionnement réseau ni la sécurité globale. Les appels, la caméra, le microphone et le transfert de données doivent encore être testés sur deux appareils physiques.
 
-## Architecture technique
+## Architecture
 
-- Android natif : Kotlin, Jetpack Compose, minSdk 26.
-- Identité : clé ECDSA P-256 générée localement dans Android Keystore ; la clé privée n'est pas exportée par l'API de l'application.
-- Appairage : invitations QR signées, défi-réponse signé, comparaison indépendante des empreintes SHA-256 et approbation manuelle.
-- Répertoire de confiance : métadonnées chiffrées dans le coffre local AES-256-GCM.
-- Réseau local : découverte UDP limitée au LAN, puis connexion TCP directe.
-- Authentification réseau : TLS mutuel avec certificat d'identité temporaire signé par la clé Android Keystore et vérification de la clé publique par rapport au répertoire local des appareils approuvés.
-- Trames applicatives : longueur préfixée, taille maximale de 1 Mio.
-- Aucun serveur applicatif, service de rendez-vous ou relais n'est utilisé.
+- Kotlin natif, Jetpack Compose, minSdk 26.
+- Clé d'identité ECDSA P-256 créée dans Android Keystore ; la clé privée n'est pas exportée par l'application.
+- Invitations QR signées, défi-réponse signé, anti-rejeu et comparaison indépendante des empreintes.
+- Répertoire des appareils approuvés et données locales chiffrés avec AES-256-GCM.
+- Découverte UDP locale puis connexion TCP directe.
+- TLS mutuel avec épinglage exact des clés publiques approuvées.
+- Messages et accusés applicatifs transportés dans la session TLS authentifiée.
+- Aucun serveur applicatif, serveur de rendez-vous, STUN, TURN ou relais.
 
-## Appairage QR hors ligne
+## Messages et livraison hors ligne
 
-1. Sur l'appareil A, initialise l'identité et crée une invitation QR.
-2. Sur l'appareil B, scanne l'invitation.
-3. B crée un défi signé et affiche le QR correspondant.
-4. A scanne le défi et génère la réponse signée.
-5. B scanne la réponse.
-6. Les deux personnes comparent les empreintes SHA-256 complètes par un canal indépendant.
-7. Chaque appareil enregistre explicitement l'autre dans son répertoire local.
+Les messages sortants sont enregistrés dans une file d'attente locale chiffrée. Un correspondant approuvé peut être sélectionné même s'il n'est pas connecté. À la reconnexion, AEGIS transmet les messages en attente.
 
-L'invitation expire après cinq minutes ; le défi et la réponse après 90 secondes. Le QR ne contient aucune clé privée. Une confirmation cochée dans l'application ne remplace pas la comparaison indépendante réelle.
+Le destinataire enregistre le message dans son historique chiffré avant d'envoyer un accusé applicatif contenant l'identifiant du message. L'expéditeur retire le message de sa file d'attente uniquement après réception de cet accusé. En cas de délai dépassé ou de rupture de connexion, le message reste en attente. Les identifiants permettent au stockage du destinataire de dédupliquer une retransmission.
 
-## Première connexion P2P locale
+Cet accusé signifie que le message a été enregistré dans l'historique local du destinataire ; il ne signifie pas qu'il a été lu. La livraison dépend du retour en ligne des deux appareils, de l'ouverture de l'application et de la joignabilité réseau. Il n'y a pas de service d'arrière-plan ni de livraison lorsque les appareils ne peuvent pas établir une connexion directe.
 
-1. Les deux appareils doivent être appairés et avoir enregistré mutuellement leurs clés.
-2. Ils doivent être connectés au même réseau Wi-Fi ou LAN ; les réseaux invités avec isolation des clients peuvent bloquer les connexions.
-3. Ouvre « Messagerie P2P locale » sur les deux appareils.
-4. L'écran recherche les appareils de confiance via des annonces UDP locales.
-5. Sur l'un des appareils, active « Attendre un pair ».
-6. Sur l'autre, sélectionne l'appareil détecté puis appuie sur « Connecter ».
-7. Après validation du certificat et de la clé épinglée par TLS mutuel, les messages texte et fichiers peuvent être échangés directement. Les fichiers sont limités à 20 Mio ; ils sont assemblés en mémoire, vérifiés par SHA-256 puis enregistrés dans le coffre chiffré.
+## Appairage QR
 
-Le port TCP est 39841 et le port UDP de découverte est 39842. Ces ports ne sont utilisés que sur le réseau local. La découverte UDP est une indication de présence, jamais une preuve d'identité ; seule la négociation TLS mutuellement authentifiée autorise la session.
+1. Sur l'appareil A, crée une invitation QR.
+2. Sur l'appareil B, scanne l'invitation et crée un défi signé.
+3. A scanne le défi et génère une réponse signée.
+4. B scanne la réponse.
+5. Les utilisateurs comparent les empreintes SHA-256 complètes par un canal indépendant.
+6. Chaque appareil enregistre explicitement l'autre.
 
-Les notes vocales sont enregistrées en PCM/WAV, limitées à 30 secondes, envoyées comme fichiers et lues depuis le coffre local chiffré. Le partage de position est déclenché manuellement et peut être configuré comme message éphémère.
+L'invitation expire après cinq minutes ; le défi et la réponse après 90 secondes. Le QR ne contient aucune clé privée. Une confirmation dans l'application ne remplace pas la comparaison indépendante.
 
-## Limites réseau importantes
+## Connexion P2P locale
 
-Les appels WebRTC sont configurés sans serveur STUN ni relais TURN et utilisent uniquement les candidats ICE locaux (host). Les appels nécessitent donc une connectivité IP directe, en pratique le même réseau local. Cette version ne fait pas de traversée NAT, de relais TURN, de serveur de rendez-vous ou de connexion Internet directe automatique. Elle fonctionne uniquement si les appareils peuvent se joindre directement sur leur réseau IP. Les opérateurs mobiles, les pare-feu, les NAT, l'isolation Wi-Fi et les réseaux distincts peuvent empêcher une connexion. Il n'existe pas de garantie de connexion entre deux réseaux éloignés sans mécanisme de rendez-vous ou de traversée NAT ; l'ajout d'un relais serait contraire au choix d'architecture retenu.
+1. Les appareils doivent être appairés mutuellement.
+2. Ils doivent pouvoir communiquer sur le même réseau local ; l'isolation des clients Wi-Fi peut bloquer la liaison.
+3. Ouvre la messagerie P2P sur les deux appareils.
+4. Active « Attendre un pair » sur l'un d'eux.
+5. Sur l'autre, sélectionne l'appareil détecté puis connecte-toi.
+6. Après authentification TLS mutuelle, les messages et fichiers peuvent être échangés.
 
-## Protections locales et limites
+Port TCP : 39841. Port UDP de découverte : 39842. La découverte UDP indique seulement une présence potentielle ; elle ne prouve pas l'identité. Seule la validation TLS mutuelle autorise la session.
 
-- PIN de 6 à 12 chiffres, vérifié par PBKDF2-HMAC-SHA256 avec sel aléatoire.
-- Authentification biométrique forte via AndroidX BiometricPrompt si disponible.
+## Limites réseau
+
+Les appels WebRTC utilisent uniquement les candidats ICE hôtes, sans STUN ni TURN. La communication nécessite une connectivité IP directe, généralement sur le même réseau local. Il n'y a pas de traversée NAT, de relais ni de rendez-vous distant. Les pare-feu, réseaux mobiles, réseaux distincts ou l'isolation Wi-Fi peuvent empêcher la connexion.
+
+## Sécurité locale et limites
+
+- PIN de 6 à 12 chiffres, PBKDF2-HMAC-SHA256 avec sel aléatoire.
+- Biométrie forte via AndroidX BiometricPrompt si l'appareil la prend en charge.
 - Verrouillage après 60 secondes d'inactivité et au passage en arrière-plan.
 - Temporisation progressive des tentatives PIN.
-- Au dixième échec enregistré, suppression de la clé d'identité et réinitialisation du verrouillage local.
-- Coffre local AES-256-GCM utilisant une clé Android Keystore distincte.
+- Au dixième échec enregistré, suppression de la clé d'identité locale.
+- Coffre AES-256-GCM avec clé Android Keystore distincte.
+- Les messages éphémères sont purgés localement ; cela ne supprime pas les copies déjà consultées, exportées ou capturées par le destinataire.
 
-Le compteur PIN est stocké dans les préférences privées de l'application et n'est pas inviolable. Un attaquant contrôlant le système peut manipuler les données, l'horloge ou l'état restauré. La suppression d'une clé ou d'un fichier ne garantit pas l'effacement physique de toutes les cellules flash. La sécurité dépend également de l'intégrité du système Android et des appareils des correspondants.
+Le compteur PIN n'est pas inviolable. La suppression d'une clé ou d'un fichier ne garantit pas l'effacement physique de toutes les cellules flash. Les données en clair peuvent exister temporairement en mémoire vive. La sécurité dépend aussi de l'intégrité d'Android et des appareils des correspondants.
 
 ## Construction
 
-- Android Studio
-- JDK 17
-- Android Gradle Plugin 8.9.2
-- Gradle 8.11.1
+- Android Studio, JDK 17
+- Android Gradle Plugin 8.9.2, Gradle 8.11.1
 - compileSdk 35, minSdk 26, targetSdk 35
 
-La CI GitHub exécute les tests unitaires JVM puis construit l'APK Debug. L'APK Debug n'est pas une version de production signée pour distribution.
+La CI exécute les tests unitaires JVM puis construit l'APK Debug. L'APK Debug n'est pas une version de production signée pour distribution.
 
-## Priorités de développement
+## Étapes restantes
 
-1. Tester l'appairage, la messagerie, les fichiers, la voix et les appels WebRTC sur deux téléphones physiques de marques et versions Android différentes.
-2. Ajouter une vraie couche de messages avec stockage local chiffré, gestion des accusés et des interruptions.
-3. Ajouter la reprise des transferts de fichiers interrompus et les accusés de réception.
-4. Concevoir appels audio/vidéo directs sans serveur ni relais, en documentant les limites NAT.
-5. Concevoir la récupération par second appareil sans exporter de clé privée.
-6. Faire réaliser une revue cryptographique et un audit indépendant avant utilisation réelle.
+1. Tester l'appairage, la messagerie, les accusés, les transferts, les notes vocales et les appels sur deux téléphones physiques.
+2. Implémenter la reprise des transferts de fichiers interrompus.
+3. Concevoir et implémenter la récupération via un deuxième appareil de confiance sans exporter de clé privée.
+4. Tester les scénarios de perte, reconnexion, restauration et révocation.
+5. Faire réaliser une revue cryptographique et un audit indépendant avant toute utilisation réelle.
 
-Ne jamais ajouter de clé privée, secret, PIN, donnée personnelle ou fichier de sauvegarde sensible dans Git.
+Ne jamais ajouter de clé privée, secret, PIN, donnée personnelle ou sauvegarde sensible dans Git.
