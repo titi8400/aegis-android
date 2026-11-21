@@ -42,6 +42,18 @@ AEGIS est un projet de communication Android de pair à pair (P2P), destiné à 
 
 Le QR ne contient aucune clé privée. Cette étape ne constitue pas encore un appairage complet : le scanner, la confirmation utilisateur, la comparaison de l'empreinte par un canal indépendant, la consommation persistante du nonce et le défi-réponse prouvant la possession de la clé privée distante restent à développer. Tant que ces étapes ne sont pas terminées, il ne faut pas considérer un appareil comme authentifié ni lui faire confiance.
 
+## Utilisation de l’appairage QR hors ligne
+
+1. Sur l’appareil A, initialise l’identité et crée une invitation QR.
+2. Sur l’appareil B, ouvre l’assistant et scanne l’invitation de A.
+3. Sur B, crée le défi signé et présente le QR à A.
+4. Sur A, scanne le défi et génère la réponse signée.
+5. Sur B, scanne la réponse.
+6. Sur les deux appareils, comparez les empreintes SHA-256 complètes par un canal indépendant (en personne ou par un canal déjà fiable).
+7. Cochez la confirmation et enregistrez l’autre appareil sur chaque téléphone.
+
+L’invitation expire après cinq minutes ; le défi et la réponse après 90 secondes. En cas d’expiration ou d’erreur, créez une nouvelle invitation. Cet échange ne nécessite aucun serveur ni connexion Internet : les QR sont transférés visuellement entre les téléphones.
+
 ## Coffre local chiffré (première primitive)
 
 `EncryptedFileStore` fournit des opérations de dépôt, lecture, suppression et présence d'enregistrements identifiés. Chaque enregistrement est chiffré avec AES-256-GCM ; le nonce est généré par le fournisseur cryptographique Android et l'identifiant du fichier est authentifié comme donnée associée. Le format de fichier est versionné et les écritures passent par un fichier temporaire synchronisé avant renommage. La clé AES est distincte de la clé de signature d'identité.
