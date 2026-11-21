@@ -16,9 +16,9 @@ class IncomingFileAssembler {
         val sha256: ByteArray
     )
 
-    private data class ActiveTransfer(
+    private class WipingOutputStream : ByteArrayOutputStream() {\n        fun wipe() { buf.fill(0); reset() }\n    }\n\n    private data class ActiveTransfer(
         val start: P2pFileTransferCodec.Packet.Start,
-        val output: ByteArrayOutputStream,
+        val output: WipingOutputStream,
         var nextChunkIndex: Int = 0
     )
 
@@ -32,7 +32,7 @@ class IncomingFileAssembler {
                 require(packet.size in 1..P2pFileTransferCodec.MAX_FILE_BYTES) {
                     "Taille de fichier non autorisée."
                 }
-                active = ActiveTransfer(packet, ByteArrayOutputStream())
+                active = ActiveTransfer(packet, WipingOutputStream())
                 null
             }
             is P2pFileTransferCodec.Packet.Chunk -> {
@@ -55,7 +55,7 @@ class IncomingFileAssembler {
                 val valid = bytes.size.toLong() == current.start.size &&
                     MessageDigest.isEqual(digest, packet.sha256)
                 active = null
-                current.output.reset()
+                current.output.wipe()
                 require(valid) { bytes.fill(0); digest.fill(0); "Fichier incomplet ou empreinte SHA-256 incorrecte." }
                 CompletedFile(
                     current.start.transferId,
@@ -70,7 +70,7 @@ class IncomingFileAssembler {
 
     @Synchronized
     fun cancel() {
-        active?.output?.reset()
+        active?.output?.wipe()
         active = null
     }
 
