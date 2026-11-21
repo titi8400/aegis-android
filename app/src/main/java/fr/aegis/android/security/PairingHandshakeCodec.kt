@@ -62,10 +62,10 @@ object PairingHandshakeCodec {
         require(nowEpochMs <= invite.expiresAtEpochMs) { "Invitation expirée" }
         val stableChallengerId = challengerDeviceId ?: PairingInviteCodec.deviceIdForPublicKey(challengerIdentity.publicKeyEncoded())
         require(isCanonicalUuid(stableChallengerId)) { "Identifiant local invalide" }
+        require(stableChallengerId == PairingInviteCodec.deviceIdForPublicKey(challengerIdentity.publicKeyEncoded())) { "Identifiant local non lié à sa clé publique" }
         val nonce = randomNonce()
         val publicKey = challengerIdentity.publicKeyEncoded()
         validateP256(publicKey)
-        require(challengerId == PairingInviteCodec.deviceIdForPublicKey(publicKey)) { "Identifiant du pair non lié à sa clé publique" }
         val unsigned = challengeCanonical(
             invite.deviceId, invite.nonce, stableChallengerId, nowEpochMs, nonce, publicKey
         )
@@ -101,6 +101,7 @@ object PairingHandshakeCodec {
         val publicKey = decode(f[7], MAX_KEY_BYTES)
         val signature = decode(f[8], MAX_SIGNATURE_BYTES)
         validateP256(publicKey)
+        require(challengerId == PairingInviteCodec.deviceIdForPublicKey(publicKey)) { "Identifiant du pair non lié à sa clé publique" }
         val unsigned = challengeCanonical(
             expectedInvite.deviceId, inviteNonce, challengerId, createdAt, challengeNonce, publicKey
         )
