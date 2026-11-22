@@ -116,3 +116,12 @@ Ne jamais ajouter de clé privée, secret, PIN, donnée personnelle ou sauvegard
 Le socle actuel sérialise les enregistrements de conversations, la file d'attente sortante, les fichiers reçus et l'index des fichiers, puis chiffre l'archive avec AES-256-GCM. Le secret de récupération est aléatoire, distinct de la clé du coffre local et doit être transmis séparément à l'utilisateur. Les archives sont versionnées, bornées à 64 Mio au total et à 20 Mio par enregistrement ; les identifiants non autorisés, les doublons et les données ajoutées en fin de fichier sont rejetés.
 
 Les clés privées Android Keystore, l'identité de l'appareil, les codes PIN et le répertoire des appareils approuvés sont exclus de l'archive. Après restauration, l'appareil utilise sa propre identité et les contacts doivent être appairés de nouveau. À ce stade, l'interface de sauvegarde/restauration et le transfert P2P de l'archive ne sont pas encore disponibles.
+
+
+## Récupération utilisable — version 0.17.0
+
+Le menu principal donne accès au centre de récupération. L'utilisateur peut créer une archive chiffrée depuis le coffre local via le sélecteur de fichiers Android ; AEGIS affiche alors un code aléatoire à conserver séparément. Sur un nouvel appareil, l'utilisateur sélectionne l'archive et saisit ce code pour vérifier son authenticité et restaurer les enregistrements autorisés. Les données existantes ne sont jamais écrasées ; les conflits entraînent un refus de restauration. Le code n'est pas enregistré par AEGIS.
+
+Cette version fournit un export/import de fichier chiffré, pas un transfert P2P automatique entre deux appareils. Le fichier et le code doivent être déplacés séparément par l'utilisateur. L'identité cryptographique du nouvel appareil est distincte et les contacts doivent être appairés à nouveau.
+
+La restauration manipule des archives bornées en mémoire ; sur les appareils disposant de peu de mémoire, une archive proche de la limite peut échouer. Prévoir une sauvegarde indépendante avant toute restauration. Les tests sur deux appareils physiques, l'intégration d'un transfert P2P dédié et l'audit indépendant restent requis avant un usage sensible.
