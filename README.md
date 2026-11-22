@@ -25,7 +25,7 @@ AEGIS est un prototype Android natif de communication privée pair à pair. Il e
 | Partage de position ponctuel | Implémenté avec autorisation et action explicites |
 | Appels audio/vidéo | Première intégration WebRTC, signalisation TLS, ICE hôte uniquement |
 | Reprise de transfert de fichiers interrompu | À développer |
-| Sérialisation versionnée des archives de récupération | Implémentée avec liste blanche de données utilisateur et limites de taille |
+| Sérialisation versionnée des archives de récupération | Implémentée : conversations, file d’attente sortante, fichiers reçus et index des fichiers ; plafond global de 64 Mio |
 | Chiffrement des archives de récupération | AES-256-GCM avec secret aléatoire distinct ; tests unitaires ajoutés |
 | Export/restauration depuis l'interface | À intégrer |
 | Transfert P2P de l'archive entre les deux appareils | À intégrer |
@@ -113,6 +113,6 @@ Ne jamais ajouter de clé privée, secret, PIN, donnée personnelle ou sauvegard
 
 ## Récupération — socle technique 0.16.0
 
-Le socle actuel sérialise uniquement les enregistrements de conversations et les fichiers reçus, puis chiffre l'archive avec AES-256-GCM. Le secret de récupération est aléatoire, distinct de la clé du coffre local et doit être transmis séparément à l'utilisateur. Les archives sont versionnées, bornées à 20 Mio et rejettent les identifiants non autorisés, les doublons et les données ajoutées en fin de fichier.
+Le socle actuel sérialise les enregistrements de conversations, la file d'attente sortante, les fichiers reçus et l'index des fichiers, puis chiffre l'archive avec AES-256-GCM. Le secret de récupération est aléatoire, distinct de la clé du coffre local et doit être transmis séparément à l'utilisateur. Les archives sont versionnées, bornées à 64 Mio au total et à 20 Mio par enregistrement ; les identifiants non autorisés, les doublons et les données ajoutées en fin de fichier sont rejetés.
 
 Les clés privées Android Keystore, l'identité de l'appareil, les codes PIN et le répertoire des appareils approuvés sont exclus de l'archive. Après restauration, l'appareil utilise sa propre identité et les contacts doivent être appairés de nouveau. À ce stade, l'interface de sauvegarde/restauration et le transfert P2P de l'archive ne sont pas encore disponibles.
