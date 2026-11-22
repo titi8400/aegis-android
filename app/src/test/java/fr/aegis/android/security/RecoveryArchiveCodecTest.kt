@@ -9,7 +9,9 @@ class RecoveryArchiveCodecTest {
     @Test fun roundTripPreservesAllowedRecords() {
         val records = listOf(
             RecoveryArchiveCodec.Record("chat_0123456789abcdef", byteArrayOf(1, 2, 3)),
-            RecoveryArchiveCodec.Record("received_0123456789abcdef", byteArrayOf(4, 5, 6, 7))
+            RecoveryArchiveCodec.Record("received_0123456789abcdef", byteArrayOf(4, 5, 6, 7)),
+            RecoveryArchiveCodec.Record("received_files_index_v1", byteArrayOf(8)),
+            RecoveryArchiveCodec.Record("outbox_0123456789abcdef", byteArrayOf(9))
         )
         val decoded = RecoveryArchiveCodec.decode(RecoveryArchiveCodec.encode(records))
         assertEquals(records.map { it.id }, decoded.map { it.id })
@@ -20,6 +22,14 @@ class RecoveryArchiveCodecTest {
         assertThrows(IllegalArgumentException::class.java) {
             RecoveryArchiveCodec.encode(listOf(RecoveryArchiveCodec.Record("trusted_peers_v1", byteArrayOf(1))))
         }
+    }
+
+    @Test fun acceptsReceivedFileIndexAndPendingOutbox() {
+        val records = listOf(
+            RecoveryArchiveCodec.Record("received_files_index_v1", byteArrayOf(1)),
+            RecoveryArchiveCodec.Record("outbox_0123456789abcdef", byteArrayOf(2))
+        )
+        assertEquals(2, RecoveryArchiveCodec.decode(RecoveryArchiveCodec.encode(records)).size)
     }
 
     @Test fun rejectsDuplicateRecords() {
