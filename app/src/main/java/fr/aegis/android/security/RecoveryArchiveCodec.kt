@@ -33,7 +33,7 @@ object RecoveryArchiveCodec {
                 data.write(id)
                 data.writeInt(record.bytes.size)
                 data.write(record.bytes)
-                require(output.size() <= MAX_ARCHIVE_BYTES) { "Archive de récupération supérieure à 20 Mio." }
+                require(output.size() <= MAX_ARCHIVE_BYTES) { "Archive de récupération supérieure à 64 Mio." }
             }
         }
         return output.toByteArray()
