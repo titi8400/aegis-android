@@ -13,7 +13,7 @@ object RecoveryArchiveCodec {
     private const val VERSION = 1
     private const val MAX_RECORDS = 1_024
     private const val MAX_RECORD_BYTES = 20 * 1024 * 1024
-    const val MAX_ARCHIVE_BYTES = 20 * 1024 * 1024
+    const val MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
     private const val MAX_ID_BYTES = 80
 
     fun encode(records: List<Record>): ByteArray {
@@ -70,6 +70,8 @@ object RecoveryArchiveCodec {
 
     fun isAllowedId(id: String): Boolean =
         id.matches(Regex("chat_[A-Za-z0-9_-]{1,76}")) ||
-            id.matches(Regex("received_[A-Za-z0-9_-]{1,70}"))
+            id.matches(Regex("outbox_[A-Za-z0-9_-]{1,70}")) ||
+            id.matches(Regex("received_[A-Za-z0-9_-]{1,70}")) ||
+            id == "received_files_index_v1"
 
 }
