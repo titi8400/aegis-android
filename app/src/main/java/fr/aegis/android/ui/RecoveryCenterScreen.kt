@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -124,7 +126,7 @@ fun RecoveryCenterScreen(onClose: () -> Unit) {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(22.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(22.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("CENTRE DE RÉCUPÉRATION", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -173,7 +175,7 @@ fun RecoveryCenterScreen(onClose: () -> Unit) {
             "Important : cette fonction exporte et importe un fichier chiffré via le sélecteur Android. Le transfert direct entre deux téléphones et la sauvegarde automatique sur un second appareil ne sont pas encore intégrés. Effectue la restauration sur un appareil neuf ou après sauvegarde préalable de ses données.",
             color = Color(0xFF9EADBD), fontSize = 11.sp
         )
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(8.dp))
         Button(
             onClick = onClose,
             modifier = Modifier.fillMaxWidth(),
