@@ -121,6 +121,17 @@ class EncryptedFileStore(context: Context) {
         return !file.exists() || file.delete()
     }
 
+    /** Lists validated record identifiers; ciphertext filenames never leave this private vault API. */
+    @Synchronized
+    fun listRecordIds(): List<String> = directory.listFiles()
+        ?.asSequence()
+        ?.filter { it.isFile && it.name.endsWith(".aeg") }
+        ?.map { it.name.removeSuffix(".aeg") }
+        ?.filter { it.matches(Regex("[A-Za-z0-9_-]{1,80}")) }
+        ?.sorted()
+        ?.toList()
+        ?: emptyList()
+
     @Synchronized
     fun contains(recordId: String): Boolean {
         validateRecordId(recordId)
