@@ -45,6 +45,17 @@ object RecoveryBackupCodec {
         }
     }
 
+    /** Validates a recovery code entered during restore. */
+    fun parseSecret(code: String): RecoverySecret {
+        require(code.length <= 64 && code.startsWith(SECRET_PREFIX)) {
+            "Code de récupération AEGIS invalide."
+        }
+        val candidate = RecoverySecret(code.trim())
+        val key = decodeSecret(candidate)
+        key.fill(0)
+        return candidate
+    }
+
     /** Encrypts a serialized recovery archive. The caller retains responsibility for clearing plaintext. */
     fun encrypt(archive: ByteArray, secret: RecoverySecret): ByteArray {
         require(archive.isNotEmpty() && archive.size <= MAX_ARCHIVE_BYTES) {
