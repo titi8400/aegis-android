@@ -27,7 +27,7 @@ AEGIS est un prototype Android natif de communication privée pair à pair. Il e
 | Reprise de transfert de fichiers interrompu | À développer |
 | Sérialisation versionnée des archives de récupération | Implémentée : conversations, file d’attente sortante, fichiers reçus et index des fichiers ; plafond global de 64 Mio |
 | Chiffrement des archives de récupération | AES-256-GCM avec secret aléatoire distinct ; tests unitaires ajoutés |
-| Export/restauration depuis l'interface | À intégrer |
+| Export/restauration depuis l'interface | Disponible en fichier chiffré depuis 0.17.0 |
 | Transfert P2P de l'archive entre les deux appareils | À intégrer |
 | Réappairage des contacts après restauration | À intégrer |
 | Tests sur deux téléphones physiques | À réaliser |
@@ -115,7 +115,7 @@ Ne jamais ajouter de clé privée, secret, PIN, donnée personnelle ou sauvegard
 
 Le socle actuel sérialise les enregistrements de conversations, la file d'attente sortante, les fichiers reçus et l'index des fichiers, puis chiffre l'archive avec AES-256-GCM. Le secret de récupération est aléatoire, distinct de la clé du coffre local et doit être transmis séparément à l'utilisateur. Les archives sont versionnées, bornées à 64 Mio au total et à 20 Mio par enregistrement ; les identifiants non autorisés, les doublons et les données ajoutées en fin de fichier sont rejetés.
 
-Les clés privées Android Keystore, l'identité de l'appareil, les codes PIN et le répertoire des appareils approuvés sont exclus de l'archive. Après restauration, l'appareil utilise sa propre identité et les contacts doivent être appairés de nouveau. À ce stade, l'interface de sauvegarde/restauration et le transfert P2P de l'archive ne sont pas encore disponibles.
+Les clés privées Android Keystore, l'identité de l'appareil, les codes PIN et le répertoire des appareils approuvés sont exclus de l'archive. Après restauration, l'appareil utilise sa propre identité et les contacts doivent être appairés de nouveau. Depuis la version 0.17.0, l'interface permet l'export/import d'un fichier chiffré. Le transfert P2P direct de l'archive et l'automatisation avec un second appareil restent à intégrer.
 
 
 ## Récupération utilisable — version 0.17.0
