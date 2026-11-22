@@ -26,7 +26,7 @@ object RecoveryBackupCodec {
     private const val KEY_BYTES = 32
     private const val TAG_BITS = 128
     private const val HEADER_BYTES = 4 + 1 + NONCE_BYTES
-    const val MAX_ARCHIVE_BYTES = 20 * 1024 * 1024
+    const val MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
     private const val MIN_ENVELOPE_BYTES = HEADER_BYTES + 16
     private const val MAX_ENVELOPE_BYTES = HEADER_BYTES + MAX_ARCHIVE_BYTES + 16
     private const val SECRET_PREFIX = "AEGIS-R1-"
