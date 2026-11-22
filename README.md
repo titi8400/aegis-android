@@ -4,7 +4,7 @@ AEGIS est un prototype Android natif de communication privée pair à pair. Il e
 
 ## État du projet
 
-**Version 0.15.0 — prototype P2P sur réseau local.**
+**Version 0.16.0 — prototype P2P sur réseau local ; socle de récupération en cours.**
 
 | Fonction | État |
 |---|---|
@@ -25,7 +25,11 @@ AEGIS est un prototype Android natif de communication privée pair à pair. Il e
 | Partage de position ponctuel | Implémenté avec autorisation et action explicites |
 | Appels audio/vidéo | Première intégration WebRTC, signalisation TLS, ICE hôte uniquement |
 | Reprise de transfert de fichiers interrompu | À développer |
-| Récupération des données par deuxième appareil | À développer |
+| Sérialisation versionnée des archives de récupération | Implémentée avec liste blanche de données utilisateur et limites de taille |
+| Chiffrement des archives de récupération | AES-256-GCM avec secret aléatoire distinct ; tests unitaires ajoutés |
+| Export/restauration depuis l'interface | À intégrer |
+| Transfert P2P de l'archive entre les deux appareils | À intégrer |
+| Réappairage des contacts après restauration | À intégrer |
 | Tests sur deux téléphones physiques | À réaliser |
 | Audit cryptographique indépendant | À réaliser |
 
@@ -105,3 +109,10 @@ La CI exécute les tests unitaires JVM puis construit l'APK Debug. L'APK Debug n
 5. Faire réaliser une revue cryptographique et un audit indépendant avant toute utilisation réelle.
 
 Ne jamais ajouter de clé privée, secret, PIN, donnée personnelle ou sauvegarde sensible dans Git.
+
+
+## Récupération — socle technique 0.16.0
+
+Le socle actuel sérialise uniquement les enregistrements de conversations et les fichiers reçus, puis chiffre l'archive avec AES-256-GCM. Le secret de récupération est aléatoire, distinct de la clé du coffre local et doit être transmis séparément à l'utilisateur. Les archives sont versionnées, bornées à 20 Mio et rejettent les identifiants non autorisés, les doublons et les données ajoutées en fin de fichier.
+
+Les clés privées Android Keystore, l'identité de l'appareil, les codes PIN et le répertoire des appareils approuvés sont exclus de l'archive. Après restauration, l'appareil utilise sa propre identité et les contacts doivent être appairés de nouveau. À ce stade, l'interface de sauvegarde/restauration et le transfert P2P de l'archive ne sont pas encore disponibles.
